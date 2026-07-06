@@ -70,17 +70,17 @@
     font-size:11px; font-weight:700; color:rgba(255,255,255,0.35); z-index:8; pointer-events:none; }
   #moveHint { position:absolute; left:calc(40px + env(safe-area-inset-left)); bottom:calc(90px + env(safe-area-inset-bottom));
     font-size:11px; font-weight:700; color:rgba(255,255,255,0.35); z-index:8; pointer-events:none; }
-  #adsBtn { position:absolute; left:calc(10px + env(safe-area-inset-left)); top:calc(68px + env(safe-area-inset-top));
+  #adsBtn { position:absolute; left:calc(10px + env(safe-area-inset-left)); top:calc(10px + env(safe-area-inset-top));
     width:62px; height:62px; border-radius:50%; background:rgba(45,123,196,0.28); border:2px solid rgba(90,165,232,0.7);
     color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:13px; z-index:21; touch-action:none; }
   #adsBtn.on { background:rgba(45,123,196,0.68); }
   #adsBtn:disabled { opacity:0.3; }
-  #bagBtn { position:absolute; left:calc(10px + env(safe-area-inset-left)); top:calc(140px + env(safe-area-inset-top));
-    width:62px; height:62px; border-radius:50%; background:rgba(255,209,102,0.2); border:2px solid rgba(255,209,102,0.55);
-    color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:13px; z-index:21; touch-action:none; }
-  #proneBtn { position:absolute; left:calc(10px + env(safe-area-inset-left)); top:calc(212px + env(safe-area-inset-top));
-    width:62px; height:62px; border-radius:50%; background:rgba(99,153,34,0.22); border:2px solid rgba(140,190,80,0.6);
-    color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:13px; z-index:21; touch-action:none; }
+  #bagBtn { position:absolute; left:calc(50% - 150px - 54px); bottom:calc(8px + env(safe-area-inset-bottom));
+    width:48px; height:48px; border-radius:50%; background:rgba(255,209,102,0.2); border:2px solid rgba(255,209,102,0.55);
+    color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:10px; z-index:21; touch-action:none; }
+  #proneBtn { position:absolute; left:calc(50% + 150px + 6px); bottom:calc(8px + env(safe-area-inset-bottom));
+    width:48px; height:48px; border-radius:50%; background:rgba(99,153,34,0.22); border:2px solid rgba(140,190,80,0.6);
+    color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:10px; z-index:21; touch-action:none; }
   #proneBtn.on { background:rgba(99,153,34,0.65); }
   #scopeOv { display:none; position:absolute; inset:0; z-index:9; pointer-events:none;
     background:radial-gradient(circle at center, transparent 30%, rgba(5,8,12,0.92) 42%); }
@@ -233,7 +233,7 @@ function wire(){ conn.on('data',onData); conn.on('close',lostConn); conn.on('err
 function lostConn(){ if(state==='dead')return; state='dead'; show('lostScreen'); $('gameWrap').style.display='none'; }
 
 // ---------------- 定義 ----------------
-const PLAY_R=55, EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
+const PLAY_R=80, EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
 const WPN=[
   {name:'ピストル', dmg:20, cd:0.42, spd:70, col:0x9aa3b2, spread:0.008, ammo:24, recoil:0.025},
   {name:'SMG',     dmg:12, cd:0.13, spd:65, col:0x5ad0a5, spread:0.02,  ammo:40, recoil:0.014},
@@ -241,7 +241,7 @@ const WPN=[
 ];
 const NADE_COL=0xe24b4a, AMMO_COL=0xffd166, NADE_MAX=4, SMOKE_MAX=2;
 const BALLOON_COLS=[0xe84b4a,0xffd166,0x5ad0a5,0x5aa5e8,0xf096b4,0xb78ae8];
-const SPAWNS=[[-32,-32],[32,-32],[-32,32],[32,32]];
+const SPAWNS=[[-48,-48],[48,-48],[-48,48],[48,48]];
 let heightFn=null, obstacles=[], items=[];
 let scene,camera,renderer,foeMesh,gunGroup,muzzle,waterMesh;
 const me={x:-24,z:-24,yaw:0,pitch:0,hp:100,score:0,cd:0,prot:0,slots:[0,null],sel:0,nades:0,smokes:0,
@@ -250,7 +250,7 @@ const me={x:-24,z:-24,yaw:0,pitch:0,hp:100,score:0,cd:0,prot:0,slots:[0,null],se
   watt:{0:{scope:null,noz:false,stk:false},1:{scope:null,noz:false,stk:false}}};
 const foe={x:24,z:24,tx:24,tz:24,a:0,ta:0,hp:100,prot:0,prone:false,pr:0};
 let foeScore=0, projectiles=[], nadesArr=[], puffs=[], gunKick=0, hurtT=0, hitT=0, msgT=0;
-let pFoeX=null, pFoeZ=null, foeStepAcc=0, myStepAcc=0, bobPhase=0, walkAmp=0;
+let pFoeX=null, pFoeZ=null, foeStepAcc=0, myStepAcc=0, bobPhase=0, walkAmp=0, adsT=0;
 let balloons=new Map(), balloonSeq=0, balloonTimer=0.5, myBalloons=0, foeBalloons=0, smokeClouds=[];
 let training=false, dummies=[], dmgNums=[];
 
@@ -357,11 +357,11 @@ function makeNoise(rng){
 let noise=null, noise2=null;
 function buildHeightFn(rng){
   noise=makeNoise(rng); noise2=makeNoise(rng);
-  // フィールド内の山(なだらかなガウス峰)
+  // フィールド内の山(広く高いガウス峰)
   const peaks=[];
-  for(let i=0;i<3;i++){
-    const a=rng()*6.28, r=16+rng()*28;
-    peaks.push({x:Math.cos(a)*r, z:Math.sin(a)*r, h:5+rng()*5, s:6+rng()*5});
+  for(let i=0;i<5;i++){
+    const a=rng()*6.28, r=18+rng()*46;
+    peaks.push({x:Math.cos(a)*r, z:Math.sin(a)*r, h:8+rng()*8, s:9+rng()*8});
   }
   return (x,z)=>{
     let h = noise(x*0.028,z*0.028)*6.6
@@ -373,7 +373,7 @@ function buildHeightFn(rng){
     }
     const r=Math.hypot(x,z);
     if(r>PLAY_R-3) h += (r-(PLAY_R-3))*(r-(PLAY_R-3))*0.22;
-    if(h>24) h=24+(h-24)*0.05;
+    if(h>30) h=30+(h-30)*0.05;
     return h;
   };
 }
@@ -388,30 +388,30 @@ function safeSpot(x,z){
 
 function buildWorld(rng){
   scene=new THREE.Scene();
-  scene.fog=new THREE.Fog(0xd2e2ec, 48, 155);
+  scene.fog=new THREE.Fog(0xd2e2ec, 55, 215);
   camera=new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 500);
   camera.rotation.order='YXZ';
   scene.add(new THREE.HemisphereLight(0xdcecf9, 0x51603f, 1.12));
   const sun=new THREE.DirectionalLight(0xffedc8, 0.95);
   sun.position.set(45,70,25); scene.add(sun);
 
-  const skyGeo=new THREE.SphereGeometry(230,16,12);
+  const skyGeo=new THREE.SphereGeometry(330,16,12);
   const sp=skyGeo.attributes.position, sc=new Float32Array(sp.count*3);
   const hor=[0.82,0.89,0.93], zen=[0.36,0.6,0.83];
   for(let i=0;i<sp.count;i++){
-    const t=clamp(sp.getY(i)/230,0,1), tt=Math.sqrt(t);
+    const t=clamp(sp.getY(i)/330,0,1), tt=Math.sqrt(t);
     sc[i*3]=hor[0]+(zen[0]-hor[0])*tt; sc[i*3+1]=hor[1]+(zen[1]-hor[1])*tt; sc[i*3+2]=hor[2]+(zen[2]-hor[2])*tt;
   }
   skyGeo.setAttribute('color', new THREE.BufferAttribute(sc,3));
   scene.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.BackSide, fog:false})));
   const sunDir=new THREE.Vector3(45,70,25).normalize();
   const sunBall=new THREE.Mesh(new THREE.SphereGeometry(7,10,8), new THREE.MeshBasicMaterial({color:0xfff7dc, fog:false}));
-  sunBall.position.copy(sunDir).multiplyScalar(210); scene.add(sunBall);
+  sunBall.position.copy(sunDir).multiplyScalar(300); scene.add(sunBall);
   const sunGlow=new THREE.Mesh(new THREE.SphereGeometry(14,10,8),
     new THREE.MeshBasicMaterial({color:0xfff0c0, transparent:true, opacity:0.3, blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));
   sunGlow.position.copy(sunBall.position); scene.add(sunGlow);
 
-  const SEG=150, SIZE=185;
+  const SEG=170, SIZE=260;
   const geo=new THREE.PlaneGeometry(SIZE,SIZE,SEG,SEG);
   geo.rotateX(-Math.PI/2);
   const pos=geo.attributes.position;
@@ -441,45 +441,105 @@ function buildWorld(rng){
   scene.add(waterMesh);
 
   obstacles=[];
-  // 家(壁+三角屋根+ドア+窓)
-  const wallMat=new THREE.MeshLambertMaterial({color:0xe0d5bd});
+  // ---- 建物: 中に入れる家×3 と 工場(壁単位の当たり判定・窓の上から射撃可能) ----
+  const wallMatA=new THREE.MeshLambertMaterial({color:0xe0d5bd});
+  const wallMatB=new THREE.MeshLambertMaterial({color:0x9aa0a8});
+  const floorMat=new THREE.MeshLambertMaterial({color:0xb59d78});
   const roofMat=new THREE.MeshLambertMaterial({color:0xb0533c});
-  const doorMat=new THREE.MeshLambertMaterial({color:0x6e4f33});
-  const winMat=new THREE.MeshLambertMaterial({color:0x9fd0e8});
-  for(let i=0;i<4;i++){
-    let x=0,z=0,ok=false;
-    for(let tr=0;tr<20;tr++){
-      const ang=rng()*6.28, r=10+rng()*36;
-      x=Math.cos(ang)*r; z=Math.sin(ang)*r;
-      const h=groundY(x,z);
-      // 平らで水没しない場所を探す
-      if(h>WATER_Y+1.0 && h<6 &&
-         Math.abs(groundY(x+2,z)-h)<1.2 && Math.abs(groundY(x,z+2)-h)<1.2){ ok=true; break; }
+  const winFrameM=new THREE.MeshLambertMaterial({color:0x6e5a40});
+  function addWallLine(cx,cz,yaw,x0,z0,x1,z1,top){
+    const len=Math.hypot(x1-x0,z1-z0), n=Math.max(1,Math.ceil(len/0.55));
+    const cy=Math.cos(yaw), sy=Math.sin(yaw);
+    for(let i=0;i<=n;i++){
+      const t=i/n, lx=x0+(x1-x0)*t, lz=z0+(z1-z0)*t;
+      obstacles.push({x:cx+lx*cy+lz*sy, z:cz-lx*sy+lz*cy, rr:0.35, top});
     }
-    if(!ok) continue;
-    const base=groundY(x,z), yaw=rng()*6.28;
-    const hg=new THREE.Group();
-    const walls=new THREE.Mesh(new THREE.BoxGeometry(3.6,2.3,3.1), wallMat);
-    walls.position.y=1.0; hg.add(walls);
-    const roofGeo=new THREE.ConeGeometry(2.9,1.7,4);
-    roofGeo.rotateY(Math.PI/4);
-    const roof=new THREE.Mesh(roofGeo, roofMat);
-    roof.position.y=2.95; roof.scale.z=0.88; hg.add(roof);
-    const door=new THREE.Mesh(new THREE.BoxGeometry(0.8,1.4,0.1), doorMat);
-    door.position.set(0.5,0.55,1.56); hg.add(door);
-    for(const sx of[-1,1]){
-      const win=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.6,0.08), winMat);
-      win.position.set(sx*0.9,1.4,1.56); hg.add(win);
-      const win2=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.6,0.7), winMat);
-      win2.position.set(sx*1.81,1.4,0); hg.add(win2);
+  }
+  function buildBuilding(cx,cz,yaw,opt){
+    const base=groundY(cx,cz);
+    const {W,D,H,mat,factory}=opt, TH=0.26;
+    const g=new THREE.Group();
+    function box(w,h,d,x,y,z,m){ const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m||mat); b.position.set(x,y,z); g.add(b); }
+    box(W*2+0.3,0.14,D*2+0.3, 0,0.07,0, floorMat);
+    const sideDef={F:{fix:D,ax:'x'},B:{fix:-D,ax:'x'},L:{fix:-W,ax:'z'},R:{fix:W,ax:'z'}};
+    for(const wd of opt.walls){
+      const sd=sideDef[wd.side];
+      for(const [a0,a1,ty] of wd.segs){
+        const mid=(a0+a1)/2, len=a1-a0;
+        const px= sd.ax==='x'?mid:sd.fix, pz= sd.ax==='x'?sd.fix:mid;
+        const bw= sd.ax==='x'?len:TH,    bd= sd.ax==='x'?TH:len;
+        const lx0= sd.ax==='x'?a0:sd.fix, lz0= sd.ax==='x'?sd.fix:a0;
+        const lx1= sd.ax==='x'?a1:sd.fix, lz1= sd.ax==='x'?sd.fix:a1;
+        if(ty==='wall'){
+          box(bw,H,bd, px,H/2,pz);
+          addWallLine(cx,cz,yaw, lx0,lz0,lx1,lz1, base+H);
+        } else if(ty==='door'){
+          const dt2=factory?H-1.2:H-0.6;
+          box(bw,H-dt2,bd, px,(H+dt2)/2,pz); // まぐさ(上部のみ)
+        } else { // win: 下(腰壁)+上、開口部から撃てる
+          box(bw,1.0,bd, px,0.5,pz);
+          box(bw,H-1.9,bd, px,(H+1.9)/2,pz);
+          box(bw+0.06,0.08,bd+0.06, px,1.04,pz, winFrameM);
+          addWallLine(cx,cz,yaw, lx0,lz0,lx1,lz1, base+1.05);
+        }
+      }
     }
-    hg.position.set(x,base-0.15,z); hg.rotation.y=yaw;
-    scene.add(hg);
-    obstacles.push({x,z,rr:2.5,top:base+3.6});
+    if(factory){
+      box(W*2+0.5,0.22,D*2+0.5, 0,H+0.11,0, wallMatB);
+      for(const sx of[-1,1]) box(0.3,0.5,D*2+0.5, sx*(W+0.1),H+0.45,0, wallMatB);
+      const chim=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.62,2.8,8), new THREE.MeshLambertMaterial({color:0x707880}));
+      chim.position.set(W-1.4,H+1.5,-D+1); g.add(chim);
+      const crateM=new THREE.MeshLambertMaterial({color:0x8a6238});
+      const cy2=Math.cos(yaw), sy2=Math.sin(yaw);
+      for(const [ox,oz] of [[-3.5,-1.6],[-2.4,1.4],[3,0.4]]){
+        box(1.4,1.4,1.4, ox,0.77,oz, crateM);
+        obstacles.push({x:cx+ox*cy2+oz*sy2, z:cz-ox*sy2+oz*cy2, rr:1.0, top:base+1.5});
+      }
+      for(let px=-W+1;px<W;px+=2.5){ box(0.25,H,0.3, px,H/2,D+0.02, wallMatB); box(0.25,H,0.3, px,H/2,-D-0.02, wallMatB); }
+    } else {
+      const rg=new THREE.ConeGeometry((W+0.4)*1.414,2.2,4);
+      rg.rotateY(Math.PI/4);
+      const roof=new THREE.Mesh(rg, roofMat);
+      roof.scale.z=(D+0.4)/(W+0.4);
+      roof.position.y=H+1.1;
+      g.add(roof);
+    }
+    g.position.set(cx,base,cz); g.rotation.y=yaw;
+    scene.add(g);
+  }
+  const HOUSE_WALLS=[
+    {side:'F',segs:[[-4,-2.8,'wall'],[-2.8,-0.2,'door'],[-0.2,1.0,'wall'],[1.0,2.6,'win'],[2.6,4,'wall']]},
+    {side:'B',segs:[[-4,-1,'wall'],[-1,0.6,'win'],[0.6,4,'wall']]},
+    {side:'L',segs:[[-3,-0.2,'wall'],[-0.2,1.4,'win'],[1.4,3,'wall']]},
+    {side:'R',segs:[[-3,-1.4,'wall'],[-1.4,0.2,'win'],[0.2,3,'wall']]}
+  ];
+  let placedH=0;
+  for(let att2=0; att2<60 && placedH<3; att2++){
+    const ang=rng()*6.28, r=15+rng()*48;
+    const x=Math.cos(ang)*r, z=Math.sin(ang)*r, h=groundY(x,z);
+    if(h>WATER_Y+1.0 && h<8 &&
+       Math.abs(groundY(x+3,z)-h)<1.0 && Math.abs(groundY(x,z+3)-h)<1.0 && Math.abs(groundY(x-3,z)-h)<1.0){
+      buildBuilding(x,z,rng()*6.28,{W:4,D:3,H:2.6,mat:wallMatA,walls:HOUSE_WALLS,factory:false});
+      placedH++;
+    }
+  }
+  for(let att2=0; att2<60; att2++){
+    const ang=rng()*6.28, r=18+rng()*44;
+    const x=Math.cos(ang)*r, z=Math.sin(ang)*r, h=groundY(x,z);
+    if(h>WATER_Y+1.0 && h<7 &&
+       Math.abs(groundY(x+4,z)-h)<1.2 && Math.abs(groundY(x,z+4)-h)<1.2 && Math.abs(groundY(x-4,z)-h)<1.2){
+      buildBuilding(x,z,rng()*6.28,{W:8,D:4.5,H:4.4,mat:wallMatB,factory:true,walls:[
+        {side:'F',segs:[[-8,-2,'wall'],[-2,2,'door'],[2,8,'wall']]},
+        {side:'B',segs:[[-8,2,'wall'],[2,6,'door'],[6,8,'wall']]},
+        {side:'L',segs:[[-4.5,4.5,'wall']]},
+        {side:'R',segs:[[-4.5,-0.6,'wall'],[-0.6,2.2,'win'],[2.2,4.5,'wall']]}
+      ]});
+      break;
+    }
   }
   // 岩(ゴツゴツした形状+苔)
-  for(let i=0;i<20;i++){
-    const ang=rng()*6.28, r=7+rng()*42, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+  for(let i=0;i<26;i++){
+    const ang=rng()*6.28, r=7+rng()*64, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
     if(groundY(x,z)<WATER_Y+0.3){ continue; }
     const rad=1.0+rng()*1.8;
     const col=new THREE.Color().setHSL(0.07+rng()*0.05, 0.05+rng()*0.05, 0.4+rng()*0.12);
@@ -539,23 +599,54 @@ function buildWorld(rng){
     }
     obstacles.push({x,z,rr:0.42*s,top:base+2.0*s});
   }
-  for(let i=0;i<40;i++){
+  for(let i=0;i<44;i++){
     let x=0,z=0,ok=false;
     for(let tr=0;tr<14;tr++){
-      const ang=rng()*6.28, r=6+rng()*43;
+      const ang=rng()*6.28, r=6+rng()*64;
       x=Math.cos(ang)*r; z=Math.sin(ang)*r;
       const h=groundY(x,z);
-      if(h>WATER_Y+1.2 && h<6.5){ ok=true; break; }
+      if(h>WATER_Y+1.2 && h<8){ ok=true; break; }
     }
     if(!ok) continue;
     const base=groundY(x,z), s=0.8+rng()*0.7;
     if(rng()<0.55) addConifer(x,z,base,s); else addLeafTree(x,z,base,s);
   }
+  // 森エリア: 針葉樹が密集(インスタンス描画で軽量)
+  function addForest(fx,fz,rad,count){
+    const trunkGeo=new THREE.CylinderGeometry(0.13,0.24,1.7,6); trunkGeo.translate(0,0.85,0);
+    const coneGeoA=new THREE.ConeGeometry(1.5,2.8,7); coneGeoA.translate(0,2.7,0);
+    const coneGeoB=new THREE.ConeGeometry(1.05,2.1,7); coneGeoB.translate(0,4.1,0);
+    const tI=new THREE.InstancedMesh(trunkGeo, barkMat, count);
+    const cA=new THREE.InstancedMesh(coneGeoA, new THREE.MeshLambertMaterial({color:0x2e6b28}), count);
+    const cB=new THREE.InstancedMesh(coneGeoB, new THREE.MeshLambertMaterial({color:0x3a7d33}), count);
+    const d=new THREE.Object3D();
+    for(let i=0;i<count;i++){
+      let x=0,z=0,h=0,ok=false;
+      for(let tr=0;tr<10;tr++){
+        const a=rng()*6.28, r=Math.sqrt(rng())*rad;
+        x=fx+Math.cos(a)*r; z=fz+Math.sin(a)*r; h=groundY(x,z);
+        if(h>WATER_Y+0.9 && h<14){ ok=true; break; }
+      }
+      if(!ok){ d.position.set(0,-90,0); d.rotation.set(0,0,0); d.scale.setScalar(0.001); }
+      else {
+        const s=0.7+rng()*0.8;
+        d.position.set(x,h,z); d.rotation.set(0,rng()*6.28,0); d.scale.setScalar(s);
+        obstacles.push({x,z,rr:0.35*s,top:h+1.6*s});
+      }
+      d.updateMatrix();
+      tI.setMatrixAt(i,d.matrix); cA.setMatrixAt(i,d.matrix); cB.setMatrixAt(i,d.matrix);
+    }
+    scene.add(tI,cA,cB);
+  }
+  for(let i=0;i<3;i++){
+    const a=rng()*6.28, r=22+rng()*44;
+    addForest(Math.cos(a)*r, Math.sin(a)*r, 11+rng()*5, 32);
+  }
   // 倒木と切り株
-  for(let i=0;i<7;i++){
+  for(let i=0;i<8;i++){
     let x=0,z=0,ok=false;
     for(let tr=0;tr<12;tr++){
-      const ang=rng()*6.28, r=6+rng()*40;
+      const ang=rng()*6.28, r=6+rng()*58;
       x=Math.cos(ang)*r; z=Math.sin(ang)*r;
       const h=groundY(x,z);
       if(h>WATER_Y+0.8 && h<5){ ok=true; break; }
@@ -578,7 +669,7 @@ function buildWorld(rng){
     obstacles.push({x,z,rr:0.55,top:h+rad*2.2});
   }
   for(let i=0;i<6;i++){
-    const ang=rng()*6.28, r=6+rng()*40, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+    const ang=rng()*6.28, r=6+rng()*58, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
     const h=groundY(x,z);
     if(h<WATER_Y+0.8 || h>5) continue;
     const st=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.3,0.45,8), barkMatD);
@@ -591,8 +682,8 @@ function buildWorld(rng){
     obstacles.push({x,z,rr:0.32,top:h+0.5});
   }
   // 茂み
-  for(let i=0;i<22;i++){
-    const ang=rng()*6.28, r=5+rng()*44, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+  for(let i=0;i<28;i++){
+    const ang=rng()*6.28, r=5+rng()*66, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
     if(groundY(x,z)<WATER_Y+0.5) continue;
     const s=0.4+rng()*0.5;
     const b=new THREE.Mesh(jitterGeo(new THREE.SphereGeometry(s,8,7), s*0.3),
@@ -606,9 +697,9 @@ function buildWorld(rng){
   const gCols=[0x4d8a35,0x5f9c3e,0x3f7a2c];
   const dummy=new THREE.Object3D();
   for(let m=0;m<3;m++){
-    const inst=new THREE.InstancedMesh(grassGeo, new THREE.MeshLambertMaterial({color:gCols[m]}), 320);
-    for(let i=0;i<320;i++){
-      const ang=rng()*6.28, r=3+rng()*49, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+    const inst=new THREE.InstancedMesh(grassGeo, new THREE.MeshLambertMaterial({color:gCols[m]}), 400);
+    for(let i=0;i<400;i++){
+      const ang=rng()*6.28, r=3+rng()*73, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
       const h=groundY(x,z);
       if(h<WATER_Y+0.7 || h>6.5){
         dummy.position.set(0,-60,0); dummy.rotation.set(0,0,0); dummy.scale.setScalar(0.001);
@@ -624,8 +715,8 @@ function buildWorld(rng){
   // 花(茎付き)
   const flCols=[0xffffff,0xffe08a,0xf0a9b8];
   const stemMat=new THREE.MeshLambertMaterial({color:0x3f7a2c});
-  for(let i=0;i<52;i++){
-    const ang=rng()*6.28, r=3+rng()*47, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+  for(let i=0;i<60;i++){
+    const ang=rng()*6.28, r=3+rng()*68, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
     const h=groundY(x,z);
     if(h<WATER_Y+0.9 || h>5) continue;
     const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.22,4), stemMat);
@@ -637,15 +728,15 @@ function buildWorld(rng){
     scene.add(stem,f);
   }
   const cloudMat=new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.85, fog:false});
-  for(let i=0;i<7;i++){
+  for(let i=0;i<10;i++){
     const g=new THREE.Group();
     for(let j=0;j<3;j++){
       const c=new THREE.Mesh(new THREE.SphereGeometry(4+rng()*4,7,6), cloudMat);
       c.position.set((j-1)*5+rng()*2, rng()*1.5, rng()*3); c.scale.y=0.4;
       g.add(c);
     }
-    const ang=rng()*6.28, r=30+rng()*70;
-    g.position.set(Math.cos(ang)*r, 45+rng()*18, Math.sin(ang)*r);
+    const ang=rng()*6.28, r=40+rng()*120;
+    g.position.set(Math.cos(ang)*r, 55+rng()*25, Math.sin(ang)*r);
     scene.add(g);
   }
 
@@ -653,7 +744,7 @@ function buildWorld(rng){
   function addItem(id,kind,w){
     let x=0,z=0;
     for(let tr=0;tr<20;tr++){
-      const ang=rng()*6.28, r=9+rng()*38;
+      const ang=rng()*6.28, r=10+rng()*58;
       x=Math.cos(ang)*r; z=Math.sin(ang)*r;
       if(groundY(x,z)>WATER_Y+0.6) break;
     }
@@ -756,16 +847,16 @@ function buildHamster(hostSide){
   const M=c=>new THREE.MeshLambertMaterial({color:c, map:ft});
   const Mp=c=>new THREE.MeshLambertMaterial({color:c});
   const g=new THREE.Group();
-  // 胴体・背中の模様・おなか
+  // 胴体・背中の模様・おなか(スリム体型)
   const body=new THREE.Mesh(new THREE.SphereGeometry(0.52,14,12), M(fur));
-  body.scale.set(1,0.95,1.2); body.position.y=0.6; g.add(body);
+  body.scale.set(0.8,0.95,1.14); body.position.y=0.6; g.add(body);
   const back=new THREE.Mesh(new THREE.SphereGeometry(0.44,12,10), M(furD));
-  back.scale.set(0.95,0.72,1.05); back.position.set(0,0.8,-0.1); g.add(back);
+  back.scale.set(0.76,0.72,1.0); back.position.set(0,0.8,-0.1); g.add(back);
   const belly=new THREE.Mesh(new THREE.SphereGeometry(0.4,12,10), M(0xfaf3e6));
-  belly.scale.set(0.82,0.72,0.62); belly.position.set(0,0.46,0.26); g.add(belly);
+  belly.scale.set(0.66,0.72,0.6); belly.position.set(0,0.46,0.26); g.add(belly);
   // 頭・鼻先・鼻
   const head=new THREE.Mesh(new THREE.SphereGeometry(0.34,14,12), M(fur));
-  head.scale.set(1,0.95,1.02); head.position.set(0,0.98,0.34); g.add(head);
+  head.scale.set(0.86,0.92,1.0); head.position.set(0,0.98,0.34); g.add(head);
   const muz=new THREE.Mesh(new THREE.SphereGeometry(0.16,10,8), M(0xfaf3e6));
   muz.scale.set(1,0.8,0.9); muz.position.set(0,0.9,0.6); g.add(muz);
   const nose=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,6), Mp(0xd97a8a));
@@ -782,34 +873,34 @@ function buildHamster(hostSide){
   for(const sx of[-1,1]){
     // 目+ハイライト
     const eye=new THREE.Mesh(new THREE.SphereGeometry(0.065,8,7), Mp(0x1c1a18));
-    eye.position.set(0.15*sx,1.03,0.58); g.add(eye);
+    eye.position.set(0.13*sx,1.03,0.58); g.add(eye);
     const hl=new THREE.Mesh(new THREE.SphereGeometry(0.02,6,5), Mp(0xffffff));
-    hl.position.set(0.13*sx,1.06,0.63); g.add(hl);
+    hl.position.set(0.11*sx,1.06,0.63); g.add(hl);
     // 耳(外+内)
     const ear=new THREE.Mesh(new THREE.SphereGeometry(0.13,10,8), M(furD));
-    ear.scale.set(1,1.15,0.5); ear.position.set(0.2*sx,1.3,0.22); ear.rotation.z=-sx*0.25; g.add(ear);
+    ear.scale.set(1,1.15,0.5); ear.position.set(0.17*sx,1.3,0.22); ear.rotation.z=-sx*0.25; g.add(ear);
     const inner=new THREE.Mesh(new THREE.SphereGeometry(0.075,8,6), Mp(0xf0b8c4));
-    inner.scale.set(1,1.1,0.4); inner.position.set(0.2*sx,1.29,0.27); inner.rotation.z=-sx*0.25; g.add(inner);
+    inner.scale.set(1,1.1,0.4); inner.position.set(0.17*sx,1.29,0.27); inner.rotation.z=-sx*0.25; g.add(inner);
     // ほっぺ・前あし
-    const cheek=new THREE.Mesh(new THREE.SphereGeometry(0.14,10,8), M(fur));
-    cheek.position.set(0.23*sx,0.87,0.48); g.add(cheek);
-    const arm=new THREE.Mesh(new THREE.SphereGeometry(0.09,8,7), M(fur));
-    arm.scale.set(0.8,1.2,0.8); arm.position.set(0.18*sx,0.55,0.42); g.add(arm);
+    const cheek=new THREE.Mesh(new THREE.SphereGeometry(0.13,10,8), M(fur));
+    cheek.position.set(0.19*sx,0.87,0.48); g.add(cheek);
+    const arm=new THREE.Mesh(new THREE.SphereGeometry(0.085,8,7), M(fur));
+    arm.scale.set(0.75,1.2,0.75); arm.position.set(0.15*sx,0.55,0.42); g.add(arm);
   }
   // 後あし(歩行アニメ用に参照を保持)
   const feet={};
   for(const sx of[-1,1]){
-    const foot=new THREE.Mesh(new THREE.SphereGeometry(0.12,8,7), Mp(0xe8b48e));
-    foot.scale.set(1,0.55,1.5); foot.position.set(0.22*sx,0.07,0.18); g.add(foot);
+    const foot=new THREE.Mesh(new THREE.SphereGeometry(0.11,8,7), Mp(0xe8b48e));
+    foot.scale.set(1,0.55,1.5); foot.position.set(0.18*sx,0.07,0.18); g.add(foot);
     if(sx<0) feet.L=foot; else feet.R=foot;
   }
   // しっぽ・スカーフ
   const tail=new THREE.Mesh(new THREE.SphereGeometry(0.08,7,6), M(furD));
   tail.position.set(0,0.45,-0.62); g.add(tail);
-  const band=new THREE.Mesh(new THREE.TorusGeometry(0.28,0.07,8,16), Mp(scarf));
-  band.rotation.x=Math.PI/2-0.2; band.position.set(0,0.82,0.28); g.add(band);
-  const knot=new THREE.Mesh(new THREE.SphereGeometry(0.08,7,6), Mp(scarf));
-  knot.position.set(0.12,0.72,0.5); g.add(knot);
+  const band=new THREE.Mesh(new THREE.TorusGeometry(0.24,0.065,8,16), Mp(scarf));
+  band.rotation.x=Math.PI/2-0.2; band.position.set(0,0.82,0.26); g.add(band);
+  const knot=new THREE.Mesh(new THREE.SphereGeometry(0.075,7,6), Mp(scarf));
+  knot.position.set(0.1,0.72,0.46); g.add(knot);
   // 銃
   const gun=new THREE.Group();
   const gb=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.12,0.42), Mp(0x2c313c));
@@ -818,9 +909,9 @@ function buildHamster(hostSide){
   const ggrip=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.14,0.09), Mp(0x4a3a28));
   ggrip.position.set(0,-0.11,-0.12);
   gun.add(gb,gbar,ggrip);
-  gun.position.set(0.3,0.6,0.45);
+  gun.position.set(0.25,0.6,0.45);
   g.add(gun);
-  g.scale.set(1.25,1.25,1.25);
+  g.scale.set(0.92,0.92,0.92);
   g.userData={footL:feet.L, footR:feet.R, phase:0, amp:0, flz:0.18};
   return g;
 }
@@ -1185,7 +1276,7 @@ function hostSpawnBalloon(){
   const id=balloonSeq++;
   let x=0,z=0,y=0;
   for(let tr=0;tr<20;tr++){
-    const ang=Math.random()*6.28, r=4+Math.random()*44;
+    const ang=Math.random()*6.28, r=4+Math.random()*66;
     x=Math.cos(ang)*r; z=Math.sin(ang)*r;
     const h=groundY(x,z);
     y=Math.max(h,WATER_Y)+1.4+Math.random()*2.6;
@@ -1466,11 +1557,11 @@ function updateProjectiles(dt){
     pr.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), pr.v.clone().normalize());
     pr.life-=dt;
     let dead=false;
-    if(!pr.mine && segPointDist(ax,ay,az,bx,by,bz, me.x,myCy,me.z)<(me.prone?0.6:0.85)){
+    if(!pr.mine && segPointDist(ax,ay,az,bx,by,bz, me.x,myCy,me.z)<(me.prone?0.5:0.7)){
       dead=true; puff(pr.p,0xff6a5a,0.35);
       if(me.prot<=0) takeDamage(pr.dmg);
     }
-    if(!dead && pr.mine && !training && segPointDist(ax,ay,az,bx,by,bz, foe.x,fCy,foe.z)<(foe.prone?0.7:0.95)){
+    if(!dead && pr.mine && !training && segPointDist(ax,ay,az,bx,by,bz, foe.x,fCy,foe.z)<(foe.prone?0.55:0.78)){
       dead=true; puff(pr.p,0xffd0d0,0.3);
       showDamage(pr.p, pr.dmg);
     }
@@ -1478,7 +1569,7 @@ function updateProjectiles(dt){
       for(const dm of dummies){
         if(dm.hp<=0) continue;
         const dCy=groundY(dm.x,dm.z)+0.8;
-        if(segPointDist(ax,ay,az,bx,by,bz, dm.x,dCy,dm.z)<0.95){
+        if(segPointDist(ax,ay,az,bx,by,bz, dm.x,dCy,dm.z)<0.78){
           dead=true; puff(pr.p,0xffd0d0,0.3);
           hitDummy(dm, pr.dmg, pr.p);
           break;
@@ -1697,7 +1788,7 @@ layer.addEventListener('mousedown', e=>{
 addEventListener('mouseup', ()=>{ firing=false; });
 addEventListener('mousemove', e=>{
   if(!document.pointerLockElement) return;
-  const sens=0.0022*(camera?camera.fov/72:1);
+  const sens=0.0022*(camera?(camera.fov/72)*(me.zoom?0.5:1):1);
   me.yaw -= e.movementX*sens;
   me.pitch = clamp(me.pitch-e.movementY*sens,-1.15,1.15);
 });
@@ -1730,7 +1821,7 @@ function loop(t){
   if(me.prot<=0 && $('hpLabel').textContent.includes('保護')) updBars();
 
   if(state==='playing'){
-    const sens=camera.fov/72;
+    const sens=(camera.fov/72)*(me.zoom?0.5:1);
     me.yaw   -= (aim.dx/AR)*2.6*dt*sens;
     me.pitch  = clamp(me.pitch-(aim.dy/AR)*1.8*dt*sens, -1.15, 1.15);
     if(isHost){
@@ -1787,9 +1878,13 @@ function loop(t){
     camera.fov+=(fovT-camera.fov)*Math.min(1,dt*12);
     camera.updateProjectionMatrix();
   }
-  gunGroup.position.x=(me.sel===2?0.3:0.32)+Math.sin(bobPhase)*0.015*walkAmp;
-  gunGroup.position.y=(me.sel===2?-0.28:-0.3)-gunKick*0.02+Math.abs(Math.cos(bobPhase))*0.008*walkAmp;
-  gunGroup.position.z=(me.sel===2?-0.55:-0.65)+gunKick*0.09;
+  // 覗き込み: 銃を画面中央下へ構える(腰だめ⇄ADSを補間)
+  adsT+=(((me.zoom&&me.sel<2)?1:0)-adsT)*Math.min(1,dt*10);
+  const hipX=me.sel>1?0.3:0.32, hipY=me.sel>1?-0.28:-0.3, hipZ=me.sel>1?-0.55:-0.65;
+  const swayK=1-adsT*0.85;
+  gunGroup.position.x=hipX*(1-adsT)+Math.sin(bobPhase)*0.015*walkAmp*swayK;
+  gunGroup.position.y=hipY*(1-adsT)-0.165*adsT-gunKick*0.02+Math.abs(Math.cos(bobPhase))*0.008*walkAmp*swayK;
+  gunGroup.position.z=hipZ*(1-adsT)-0.5*adsT+gunKick*0.09;
 
   const k=Math.min(1,dt*10);
   foe.x+=(foe.tx-foe.x)*k; foe.z+=(foe.tz-foe.z)*k; foe.a+=norm(foe.ta-foe.a)*k;
