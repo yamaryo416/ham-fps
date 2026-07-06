@@ -102,6 +102,21 @@
   .bagSec { font-size:12px; color:#9aa0b0; font-weight:700; margin-top:2px; }
   #bagClose { font-family:inherit; font-weight:700; font-size:14px; color:#9aa0b0; background:transparent;
     border:1.5px solid #3a3f4e; border-radius:10px; padding:9px; margin-top:2px; }
+  #bagGrid { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
+  .bslot { height:54px; border:1.5px dashed #3a3f4e; border-radius:10px; background:rgba(255,255,255,0.04);
+    color:#fff; font-family:inherit; font-weight:700; font-size:11px; line-height:1.25; touch-action:manipulation; }
+  .bslot.filled { border-style:solid; border-color:#ffd166; }
+  .bslot small { font-size:9px; color:#9aa0b0; }
+  .pickChip { position:absolute; transform:translate(-50%,-100%); display:none;
+    background:rgba(8,10,16,0.82); border:1.5px solid #ffd166; border-radius:10px; color:#fff;
+    font-family:inherit; font-weight:700; font-size:12px; padding:8px 13px; z-index:23; touch-action:none; white-space:nowrap; }
+  #swapModal { display:none; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    background:rgba(10,13,20,0.95); border:1.5px solid #3a3f4e; border-radius:16px; padding:16px;
+    z-index:46; flex-direction:column; gap:9px; width:min(320px,90vw); }
+  #swapModal h3 { font-size:14px; text-align:center; line-height:1.5; }
+  #swapRows { display:flex; flex-direction:column; gap:7px; }
+  #swapCancel { font-family:inherit; font-weight:700; font-size:13px; color:#9aa0b0; background:transparent;
+    border:1.5px solid #3a3f4e; border-radius:10px; padding:9px; }
   #fireBtn { position:absolute; right:calc(20px + env(safe-area-inset-right)); bottom:calc(190px + env(safe-area-inset-bottom));
     width:86px; height:86px; border-radius:50%; background:rgba(226,75,74,0.32); border:2.5px solid rgba(240,149,149,0.75);
     color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:15px; z-index:21; touch-action:none; }
@@ -130,7 +145,7 @@
 
 <div id="menuScreen" class="screen">
   <h1>ハムスター<span class="b">FPS</span><span class="p">アリーナ</span></h1>
-  <p class="sub">湖と森のフィールドでハムスターが1対1バトル。<br>光の柱で武器・スコープ・煙玉などを拾おう。<br>風船を20個先に割るか、相手を2回倒したら勝ち!</p>
+  <p class="sub">湖と森のフィールドでハムスターが1対1バトル。<br>近くのアイテムをタップして拾おう(武器・スコープ・回復など)。<br>相手を2回先に倒したら勝ち!風船10個ごとに強化ボーナス!</p>
   <button class="btn btn-blue" id="btnCreate">部屋を作る(きんくまチーム)</button>
   <button class="btn btn-pink" id="btnJoinMenu">部屋に入る(しろくまチーム)</button>
   <button class="btn btn-green" id="btnTrain">射撃訓練場(ひとりで練習)</button>
@@ -192,6 +207,11 @@
     <div id="bagRows"></div>
     <button id="bagClose">とじる</button>
   </div>
+  <div id="swapModal">
+    <h3 id="swapTitle"></h3>
+    <div id="swapRows"></div>
+    <button id="swapCancel">やめる</button>
+  </div>
   <div id="overlay">
     <div id="overTitle">勝ち!</div>
     <button class="btn btn-blue" id="btnAgain">もう一回勝負!</button>
@@ -245,19 +265,51 @@ function lostConn(){ if(state==='dead')return; state='dead'; show('lostScreen');
 // ---------------- 定義 ----------------
 const PLAY_R=110, EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
 const WPN=[
-  {name:'G18',   cal:'9mm', dmg:20, cd:0.42, spd:70,  col:0x9aa3b2, spread:0.008, ammo:36, mag:12, rel:1.1, recoil:0.025},
-  {name:'M416',  cal:'5mm', dmg:13, cd:0.14, spd:75,  col:0x5ad0a5, spread:0.018, ammo:60, mag:30, rel:1.6, recoil:0.013},
-  {name:'Kar98', cal:'7mm', dmg:42, cd:0.9,  spd:120, col:0xf0a54a, spread:0.003, ammo:15, mag:5,  rel:2.0, recoil:0.06}
+  {name:'G18',   cal:'9mm', dmg:20, cd:0.42, spd:70,  col:0x9aa3b2, spread:0.008, ammo:36, mag:12, rel:1.1, recoil:0.025, sc:0},
+  {name:'M416',  cal:'5mm', dmg:13, cd:0.14, spd:75,  col:0x5ad0a5, spread:0.018, ammo:60, mag:30, rel:1.6, recoil:0.013, sc:2},
+  {name:'Kar98', cal:'7mm', dmg:42, cd:0.9,  spd:120, col:0xf0a54a, spread:0.003, ammo:15, mag:5,  rel:2.0, recoil:0.06,  sc:4},
+  {name:'UMP',   cal:'9mm', dmg:10, cd:0.11, spd:65,  col:0x5ab8d0, spread:0.022, ammo:75, mag:25, rel:1.4, recoil:0.011, sc:2},
+  {name:'M16',   cal:'5mm', dmg:17, cd:0.19, spd:85,  col:0xd08a5a, spread:0.014, ammo:48, mag:20, rel:1.7, recoil:0.018, sc:2},
+  {name:'AWM',   cal:'7mm', dmg:55, cd:1.3,  spd:140, col:0xb78ae8, spread:0.002, ammo:9,  mag:3,  rel:2.4, recoil:0.08,  sc:4}
 ];
+const ITEM_LBL={nade:'グレネード',ammo:'弾薬',scope2:'2倍スコープ',scope4:'4倍スコープ',smoke:'煙玉',noz:'ノズル',stk:'ストック',heal:'回復キット'};
+const STACK_CAP={ammo:60,nade:2,smoke:2,heal:4,s2:1,s4:1,noz:1,stk:1};
+const BAG_SLOTS=8;
 const NADE_COL=0xe24b4a, AMMO_COL=0xffd166, NADE_MAX=4, SMOKE_MAX=2;
 const BALLOON_COLS=[0xe84b4a,0xffd166,0x5ad0a5,0x5aa5e8,0xf096b4,0xb78ae8];
 const SPAWNS=[[-65,-65],[65,-65],[-65,65],[65,65]];
 let heightFn=null, obstacles=[], items=[];
 let scene,camera,renderer,foeMesh,gunGroup,muzzle,waterMesh;
-const me={x:-24,z:-24,yaw:0,pitch:0,hp:100,score:0,cd:0,prot:0,slots:[0,null],sel:0,nades:0,smokes:0,
-  ammo:{0:36,1:0,2:0},mag:{0:12,1:0,2:0},rld:null,feetY:0,eyeY:0,zoom:false,prone:false,
-  bag:{s2:0,s4:0,ap:0,noz:0,stk:0},
+const me={x:-24,z:-24,yaw:0,pitch:0,hp:100,score:0,cd:0,prot:0,slots:[0,null],sel:0,
+  ammo:{}, mag:{}, rld:null,feetY:0,eyeY:0,zoom:false,prone:false,
+  bag:[],
   watt:{0:{scope:null,noz:false,stk:false},1:{scope:null,noz:false,stk:false}}};
+// バッグ(8スロット・スタック制)
+function bagCount(k){ let n=0; for(const s of me.bag) if(s.k===k) n+=s.n; return n; }
+function bagAdd(k,n){
+  let left=n;
+  for(const s of me.bag){
+    if(s.k===k && s.n<STACK_CAP[k]){
+      const t=Math.min(STACK_CAP[k]-s.n,left); s.n+=t; left-=t;
+      if(!left) break;
+    }
+  }
+  while(left>0 && me.bag.length<BAG_SLOTS){
+    const t=Math.min(STACK_CAP[k],left);
+    me.bag.push({k,n:t}); left-=t;
+  }
+  return n-left;
+}
+function bagConsume(k,n){
+  let left=n;
+  for(let i=me.bag.length-1;i>=0&&left>0;i--){
+    const s=me.bag[i];
+    if(s.k!==k) continue;
+    const t=Math.min(s.n,left); s.n-=t; left-=t;
+    if(s.n<=0) me.bag.splice(i,1);
+  }
+  return n-left;
+}
 const foe={x:24,z:24,tx:24,tz:24,a:0,ta:0,hp:100,prot:0,prone:false,pr:0,fy:0,tfy:0};
 let platforms=[], factorySite=null;
 let foeScore=0, projectiles=[], nadesArr=[], puffs=[], gunKick=0, hurtT=0, hitT=0, msgT=0;
@@ -820,7 +872,7 @@ function buildWorld(rng){
     }
     const col = kind==='gun'?WPN[w].col : kind==='nade'?NADE_COL :
       kind==='smoke'?0x9aa0b0 : kind==='scope2'?0x8ad0f0 : kind==='scope4'?0xb78ae8 :
-      kind==='noz'?0xff9a3c : kind==='stk'?0xc08a50 : AMMO_COL;
+      kind==='noz'?0xff9a3c : kind==='stk'?0xc08a50 : kind==='heal'?0x7ae87a : AMMO_COL;
     const g=new THREE.Group();
     const beam=new THREE.Mesh(
       new THREE.CylinderGeometry(0.28,0.28,26,8,1,true),
@@ -829,7 +881,7 @@ function buildWorld(rng){
     const obj=new THREE.Group();
     const LM=c=>new THREE.MeshLambertMaterial({color:c});
     if(kind==='gun'){
-      if(w===1){ // SMG: コンパクト+マガジン
+      if(WPN[w].sc!==4){ // AR/SMG系: コンパクト+マガジン
         const body=new THREE.Mesh(new THREE.BoxGeometry(0.75,0.24,0.18), LM(col));
         const mag=new THREE.Mesh(new THREE.BoxGeometry(0.15,0.32,0.16), LM(0x333844));
         mag.position.set(0.06,-0.26,0);
@@ -861,6 +913,11 @@ function buildWorld(rng){
       const pad=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.4,0.16), LM(0x8a6238));
       pad.position.set(0.28,-0.14,0); pad.rotation.z=-0.15;
       obj.add(top,pad);
+    } else if(kind==='heal'){
+      const box2=new THREE.Mesh(new THREE.BoxGeometry(0.44,0.3,0.36), LM(0xf2f2f2));
+      const cr1=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.09,0.37), LM(0x3fae5a));
+      const cr2=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.26,0.37), LM(0x3fae5a));
+      obj.add(box2,cr1,cr2);
     } else if(kind==='nade'){
       const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x4a5d3a}));
       const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.14,6), new THREE.MeshLambertMaterial({color:0x9aa0b0}));
@@ -881,8 +938,7 @@ function buildWorld(rng){
       obj.add(box,stripe);
     }
     g.add(obj);
-    const LBL={nade:'グレネード',ammo:'弾薬',scope2:'2倍スコープ',scope4:'4倍スコープ',smoke:'煙玉',noz:'ノズル',stk:'ストック'};
-    const label=makeLabelSprite(kind==='gun'?WPN[w].name:LBL[kind], '#'+col.toString(16).padStart(6,'0'));
+    const label=makeLabelSprite(kind==='gun'?WPN[w].name:ITEM_LBL[kind], '#'+col.toString(16).padStart(6,'0'));
     label.position.y=1.75;
     g.add(label);
     g.position.set(x, groundY(x,z), z);
@@ -890,9 +946,11 @@ function buildWorld(rng){
     items.push({id,kind,w,x,z,g,obj,active:true,rt:0});
   }
   let id=0;
-  for(let i=0;i<10;i++) addItem(id++,'gun',1+(i%2));
+  const GUNS=[1,3,4,2,5];
+  for(let i=0;i<10;i++) addItem(id++,'gun',GUNS[i%5]);
   for(let i=0;i<5;i++) addItem(id++,'nade',0);
   for(let i=0;i<5;i++) addItem(id++,'ammo',0);
+  for(let i=0;i<4;i++) addItem(id++,'heal',0);
   for(let i=0;i<2;i++) addItem(id++,'scope2',0);
   for(let i=0;i<2;i++) addItem(id++,'scope4',0);
   for(let i=0;i<3;i++) addItem(id++,'smoke',0);
@@ -1067,17 +1125,18 @@ function updSlots(){
   const s0=$('slot0'), s1=$('slot1'), tb=$('throwBtn');
   s0.innerHTML = slotLabel(0);
   s1.innerHTML = slotLabel(1);
-  tb.innerHTML = me.sel===2 ? 'グレネード<br>×'+me.nades
-               : me.sel===3 ? '煙玉<br>×'+me.smokes
-               : '投げ物<br>💣'+me.nades+' 💨'+me.smokes;
+  const nN=bagCount('nade'), nS=bagCount('smoke');
+  tb.innerHTML = me.sel===2 ? 'グレネード<br>×'+nN
+               : me.sel===3 ? '煙玉<br>×'+nS
+               : '投げ物<br>💣'+nN+' 💨'+nS;
   s0.classList.toggle('empty', me.slots[0]===null || me.ammo[me.slots[0]]===0);
   s1.classList.toggle('empty', me.slots[1]===null || (me.slots[1]!==null&&me.ammo[me.slots[1]]===0));
-  tb.classList.toggle('empty', me.nades===0 && me.smokes===0);
+  tb.classList.toggle('empty', nN===0 && nS===0);
   s0.classList.toggle('sel', me.sel===0);
   s1.classList.toggle('sel', me.sel===1);
   tb.classList.toggle('sel', me.sel>=2);
   if(me.sel>=2){
-    const cnt = me.sel===2 ? me.nades : me.smokes;
+    const cnt = me.sel===2 ? bagCount('nade') : bagCount('smoke');
     $('ammoCnt').textContent='×'+cnt;
     $('ammoCnt').style.color = cnt===0 ? '#f09595' : '#ffd98a';
   } else {
@@ -1093,8 +1152,8 @@ function updSlots(){
   $('adsBtn').disabled = zoomX()===1;
 }
 function selectSlot(i){
-  if(i===2){ if(me.nades<=0&&me.sel!==2) return; }
-  else if(i===3){ if(me.smokes<=0&&me.sel!==3) return; }
+  if(i===2){ if(bagCount('nade')<=0&&me.sel!==2) return; }
+  else if(i===3){ if(bagCount('smoke')<=0&&me.sel!==3) return; }
   else if(me.slots[i]===null) return;
   $('throwMenu').style.display='none';
   if(me.sel===i) return;
@@ -1112,8 +1171,9 @@ function toggleThrowMenu(show){
   const m=$('throwMenu');
   const on = show===undefined ? m.style.display!=='flex' : show;
   if(on){
-    $('tOptN').textContent='グレネード ×'+me.nades; $('tOptN').disabled=me.nades<=0;
-    $('tOptS').textContent='煙玉 ×'+me.smokes; $('tOptS').disabled=me.smokes<=0;
+    const nN=bagCount('nade'), nS=bagCount('smoke');
+    $('tOptN').textContent='グレネード ×'+nN; $('tOptN').disabled=nN<=0;
+    $('tOptS').textContent='煙玉 ×'+nS; $('tOptS').disabled=nS<=0;
     m.style.display='flex';
   } else m.style.display='none';
 }
@@ -1149,28 +1209,21 @@ function chip(text, cls, fn){
 }
 function detach(si,kind){
   const a=me.watt[si];
-  if(kind==='scope'){ if(!a.scope)return; me.bag[a.scope===2?'s2':'s4']++; a.scope=null; setZoom(false); }
-  else { if(!a[kind])return; me.bag[kind]++; a[kind]=false; }
-  sfxPick(); buildViewModel(); updBag();
+  if(kind==='scope'){
+    if(!a.scope) return;
+    if(!bagAdd(a.scope===2?'s2':'s4',1)){ bagFullMsg(); return; }
+    a.scope=null; setZoom(false);
+  } else {
+    if(!a[kind]) return;
+    if(!bagAdd(kind,1)){ bagFullMsg(); return; }
+    a[kind]=false;
+  }
+  sfxPick(); buildViewModel(); updBag(); updSlots();
 }
 function attach(kind){
-  if(kind==='s2'||kind==='s4'){
-    const wantW=kind==='s2'?1:2;
-    const si=me.slots.indexOf(wantW);
-    if(si===-1){ toast((kind==='s2'?'SMG':'スナイパー')+'を持っていないと装着できない'); return; }
-    const a=me.watt[si];
-    if(a.scope) me.bag[a.scope===2?'s2':'s4']++;
-    a.scope = kind==='s2'?2:4;
-    me.bag[kind]--;
-  } else {
-    let si=-1;
-    const cands = me.sel<2 ? [me.sel,1-me.sel] : [0,1];
-    for(const c of cands){ if(me.slots[c]!==null && !me.watt[c][kind]){ si=c; break; } }
-    if(si===-1){ toast('装着できる武器がない'); return; }
-    me.watt[si][kind]=true;
-    me.bag[kind]--;
-  }
-  sfxPick(); buildViewModel(); updBag();
+  if(bagCount(kind)<=0) return;
+  if(autoAttachKind(kind)){ bagConsume(kind,1); sfxPick(); updBag(); updSlots(); }
+  else toast(kind==='s2'?'2倍スコープが付く武器がない(AR/SMG系)':kind==='s4'?'4倍スコープが付く武器がない(スナイパー系)':'装着できる武器がない');
 }
 function updBag(){
   const rows=$('bagRows');
@@ -1194,7 +1247,7 @@ function updBag(){
     } else {
       // スコープ枠
       if(a.scope) row.append(chip('🔭 '+a.scope+'倍スコープ ✕', '', ()=>detach(si,'scope')));
-      else row.append(chip(wid===0?'スコープ不可':'スコープなし','empty'));
+      else row.append(chip(WPN[wid].sc===0?'スコープ不可':'スコープなし('+WPN[wid].sc+'倍対応)','empty'));
       // ノズル枠
       if(a.noz) row.append(chip('🔩 ノズル ✕', '', ()=>detach(si,'noz')));
       else row.append(chip('ノズルなし','empty'));
@@ -1205,29 +1258,60 @@ function updBag(){
     card.append(row);
     rows.append(card);
   }
-  // バッグの中身
+  // バッグの中身(8スロット・スタック制)
   const sec=document.createElement('div'); sec.className='bagSec';
-  sec.textContent='バッグの中身(タップで装着)';
+  sec.textContent='バッグ('+me.bag.length+'/'+BAG_SLOTS+'スロット)— タップで使用/装着';
   rows.append(sec);
-  const inv=document.createElement('div'); inv.className='attRow';
-  if(me.bag.s2>0) inv.append(chip('🔭 2倍スコープ ×'+me.bag.s2,'inv',()=>attach('s2')));
-  if(me.bag.s4>0) inv.append(chip('🔭 4倍スコープ ×'+me.bag.s4,'inv',()=>attach('s4')));
-  if(me.bag.noz>0) inv.append(chip('🔩 ノズル ×'+me.bag.noz,'inv',()=>attach('noz')));
-  if(me.bag.stk>0) inv.append(chip('🪵 ストック ×'+me.bag.stk,'inv',()=>attach('stk')));
-  if(me.bag.ap>0){
-    const b=chip('📦 弾薬パック ×'+me.bag.ap+'(使う)','inv',()=>{
-      me.bag.ap--;
-      for(const s of me.slots) if(s!==null) me.ammo[s]=WPN[s].ammo;
-      toast('弾薬フル補給!'); sfxPick();
-      updSlots(); updBag();
-    });
-    let needAmmo=false;
-    for(const s of me.slots) if(s!==null && me.ammo[s]<WPN[s].ammo) needAmmo=true;
-    b.disabled=!needAmmo;
-    inv.append(b);
+  const grid=document.createElement('div'); grid.id='bagGrid';
+  const INFO={
+    ammo:{ic:'📦',nm:'弾薬',act:'補給'},
+    nade:{ic:'💣',nm:'グレネード',act:''},
+    smoke:{ic:'💨',nm:'煙玉',act:''},
+    heal:{ic:'💊',nm:'回復キット',act:'+20'},
+    s2:{ic:'🔭',nm:'2倍スコープ',act:'装着'},
+    s4:{ic:'🔭',nm:'4倍スコープ',act:'装着'},
+    noz:{ic:'🔩',nm:'ノズル',act:'装着'},
+    stk:{ic:'🪵',nm:'ストック',act:'装着'}
+  };
+  for(let i=0;i<BAG_SLOTS;i++){
+    const st=me.bag[i];
+    const b=document.createElement('button');
+    b.className='bslot'+(st?' filled':'');
+    if(st){
+      const inf=INFO[st.k];
+      b.innerHTML=inf.ic+' '+inf.nm+'<br><small>×'+st.n+(inf.act?'・'+inf.act:'')+'</small>';
+      const act=()=>{
+        if(st.k==='ammo'){
+          let need=0;
+          for(const s of me.slots) if(s!==null) need+=WPN[s].ammo-me.ammo[s];
+          if(need<=0){ toast('予備弾は満タン!'); return; }
+          let take=Math.min(st.n,need);
+          bagConsume('ammo',take);
+          for(const s of me.slots){
+            if(s===null||take<=0) continue;
+            const t2=Math.min(WPN[s].ammo-me.ammo[s],take);
+            me.ammo[s]+=t2; take-=t2;
+          }
+          toast('弾薬を補給!'); sfxPick(); updSlots(); updBag();
+        } else if(st.k==='heal'){
+          if(me.hp>=100){ toast('HPは満タン!'); return; }
+          bagConsume('heal',1);
+          me.hp=Math.min(100,me.hp+20);
+          toast('回復!+20'); sfxPick(); updBars(); updBag();
+        } else if(st.k==='s2'||st.k==='s4'||st.k==='noz'||st.k==='stk'){
+          attach(st.k);
+        } else {
+          toast('投げ物は右下の「投げ物」ボタンで使おう');
+        }
+      };
+      b.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); act(); },{passive:false});
+      b.addEventListener('mousedown', e=>{ e.stopPropagation(); act(); });
+    } else {
+      b.innerHTML='<small>空き</small>';
+    }
+    grid.append(b);
   }
-  if(!inv.children.length) inv.append(chip('からっぽ','empty'));
-  rows.append(inv);
+  rows.append(grid);
 }
 function toggleBag(show){
   const p=$('bagPanel');
@@ -1240,6 +1324,46 @@ $('bagClose').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopProp
 $('bagClose').addEventListener('mousedown',  e=>{ e.stopPropagation(); toggleBag(false); });
 $('bagPanel').addEventListener('touchstart', e=>{ e.stopPropagation(); },{passive:true});
 $('bagPanel').addEventListener('mousedown',  e=>{ e.stopPropagation(); });
+$('swapCancel').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); closeSwap(); },{passive:false});
+$('swapCancel').addEventListener('mousedown',  e=>{ e.stopPropagation(); closeSwap(); });
+$('swapModal').addEventListener('touchstart', e=>{ e.stopPropagation(); },{passive:true});
+$('swapModal').addEventListener('mousedown',  e=>{ e.stopPropagation(); });
+
+// ---------------- 拾うチップ(近くのアイテムをタップで拾う) ----------------
+const pickChips=[];
+for(let i=0;i<3;i++){
+  const b=document.createElement('button');
+  b.className='pickChip';
+  b.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); takeItem(+b.dataset.id,true); },{passive:false});
+  b.addEventListener('mousedown', e=>{ e.stopPropagation(); takeItem(+b.dataset.id,true); });
+  $('gameWrap').appendChild(b);
+  pickChips.push(b);
+}
+function nearbyItems(){
+  const near=[];
+  for(const it of items){
+    if(!it.active) continue;
+    const d=Math.hypot(it.x-me.x, it.z-me.z);
+    if(d<3.2) near.push({it,d});
+  }
+  near.sort((a,b)=>a.d-b.d);
+  return near;
+}
+function updatePickChips(){
+  const near = state==='playing' ? nearbyItems() : [];
+  for(let i=0;i<pickChips.length;i++){
+    const c=pickChips[i];
+    if(i>=near.length){ c.style.display='none'; continue; }
+    const it=near[i].it;
+    const v=new THREE.Vector3(it.x, groundY(it.x,it.z)+1.15, it.z).project(camera);
+    if(v.z>1 || Math.abs(v.x)>1.05 || Math.abs(v.y)>1.05){ c.style.display='none'; continue; }
+    c.style.display='block';
+    c.style.left=((v.x*0.5+0.5)*innerWidth)+'px';
+    c.style.top=((-v.y*0.5+0.5)*innerHeight)+'px';
+    c.textContent='拾う: '+(it.kind==='gun'?WPN[it.w].name:ITEM_LBL[it.kind]);
+    c.dataset.id=it.id;
+  }
+}
 
 // ---------------- ゲーム制御 ----------------
 function onData(d){
@@ -1292,28 +1416,19 @@ function startGame(){
 function onResize(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); }
 function resetLoadout(){
   returnAtts(0); returnAtts(1); // 装着中のアタッチメントはバッグへ戻る
-  me.slots=[0,null]; me.sel=0; me.nades=0; me.smokes=0;
-  me.ammo={0:WPN[0].ammo, 1:0, 2:0};
-  me.mag={0:WPN[0].mag, 1:0, 2:0};
+  me.slots=[0,null]; me.sel=0;
+  me.ammo={}; me.mag={};
+  for(let i=0;i<WPN.length;i++){ me.ammo[i]=0; me.mag[i]=0; }
+  me.ammo[0]=WPN[0].ammo; me.mag[0]=WPN[0].mag;
   me.rld=null;
   setZoom(false);
   setProne(false);
 }
 function returnAtts(si){
   const a=me.watt[si];
-  if(a.scope){ me.bag[a.scope===2?'s2':'s4']++; a.scope=null; }
-  if(a.noz){ me.bag.noz++; a.noz=false; }
-  if(a.stk){ me.bag.stk++; a.stk=false; }
-}
-function attCount(kind){
-  let n=0;
-  for(const si of [0,1]){
-    const a=me.watt[si];
-    if(kind==='s2'&&a.scope===2) n++;
-    if(kind==='s4'&&a.scope===4) n++;
-    if((kind==='noz'&&a.noz)||(kind==='stk'&&a.stk)) n++;
-  }
-  return n;
+  if(a.scope){ if(!bagAdd(a.scope===2?'s2':'s4',1)) toast('バッグがいっぱいでスコープを失った…'); a.scope=null; }
+  if(a.noz){ if(!bagAdd('noz',1)) toast('バッグがいっぱいでノズルを失った…'); a.noz=false; }
+  if(a.stk){ if(!bagAdd('stk',1)) toast('バッグがいっぱいでストックを失った…'); a.stk=false; }
 }
 function doReset(){
   me.score=0; foeScore=0; me.hp=100; foe.hp=100; me.cd=0;
@@ -1322,9 +1437,10 @@ function doReset(){
   balloons.clear(); balloonSeq=0; balloonTimer=0.8;
   for(const s of smokeClouds) scene.remove(s.g);
   smokeClouds=[];
-  me.bag={s2:0,s4:0,ap:0,noz:0,stk:0};
+  me.bag=[];
   me.watt={0:{scope:null,noz:false,stk:false},1:{scope:null,noz:false,stk:false}};
   $('bagPanel').style.display='none';
+  closeSwap();
   resetLoadout();
   const mi=isHost?0:3, fi=isHost?3:0;
   let sp=safeSpot(SPAWNS[mi][0],SPAWNS[mi][1]);
@@ -1403,11 +1519,9 @@ function popBalloon(id,mine){
     send({t:'bpop',id});
     updScore();
     if(myBalloons%10===0) grantBalloonReward();
-    if(!training && myBalloons>=BALLOON_WIN) gameOver(true);
   } else {
     foeBalloons++;
     updScore();
-    if(foeBalloons>=BALLOON_WIN) gameOver(false);
   }
 }
 
@@ -1469,17 +1583,16 @@ function grantBalloonReward(){
   }
   for(const si of [0,1]){
     const wid=me.slots[si];
-    if((wid===1||wid===2) && !me.watt[si].scope){
-      me.watt[si].scope = wid===1?2:4;
-      toast('🎈風船ボーナス!'+WPN[wid].name+'に'+(wid===1?2:4)+'倍スコープが付いた!');
+    if(wid!==null && WPN[wid].sc>0 && !me.watt[si].scope){
+      me.watt[si].scope = WPN[wid].sc;
+      toast('🎈風船ボーナス!'+WPN[wid].name+'に'+WPN[wid].sc+'倍スコープが付いた!');
       sfxPick(); buildViewModel(); updBag();
       return;
     }
   }
-  if(me.bag.ap<2){ me.bag.ap++; toast('🎈風船ボーナス!弾薬パック +1'); sfxPick(); updBag(); return; }
-  me.nades=Math.min(NADE_MAX, me.nades+1);
-  toast('🎈風船ボーナス!グレネード +1');
-  sfxPick(); updSlots();
+  if(bagAdd('heal',1)){ toast('🎈風船ボーナス!回復キット +1'); sfxPick(); updBag(); return; }
+  if(bagAdd('ammo',30)){ toast('🎈風船ボーナス!弾薬 +30'); sfxPick(); updBag(); return; }
+  toast('🎈風船ボーナス!…バッグがいっぱいだった');
 }
 
 // ---------------- 煙幕 ----------------
@@ -1506,77 +1619,124 @@ function updateSmokeClouds(dt){
   }
 }
 
-function takeItem(id,mine){
-  const it=items[id];
-  if(!it.active) return;
-  if(mine){
-    if(it.kind==='gun'){
-      if(me.slots[0]===it.w || me.slots[1]===it.w){
-        if(me.ammo[it.w]>=WPN[it.w].ammo && me.mag[it.w]>=WPN[it.w].mag) return;
-        me.ammo[it.w]=WPN[it.w].ammo;
-        me.mag[it.w]=WPN[it.w].mag;
-        toast(WPN[it.w].name+'の弾を補給!');
-        updSlots();
-      } else {
-        let slot = me.slots[0]===null?0 : me.slots[1]===null?1 : (me.sel>1?0:me.sel);
-        returnAtts(slot); // 持ち替え時はアタッチメントをバッグへ戻す
-        me.slots[slot]=it.w;
-        me.ammo[it.w]=WPN[it.w].ammo;
-        me.mag[it.w]=WPN[it.w].mag;
-        toast(WPN[it.w].name+' を拾った!(スロット'+(slot+1)+')');
-        if(me.sel===slot) buildViewModel(); else updSlots();
-        updBag();
-      }
-    } else if(it.kind==='nade'){
-      if(me.nades>=NADE_MAX) return;
-      me.nades=Math.min(NADE_MAX, me.nades+2);
-      toast('グレネード +2');
-      updSlots();
-    } else if(it.kind==='smoke'){
-      if(me.smokes>=SMOKE_MAX) return;
-      me.smokes++;
-      toast('レア!煙玉 +1');
-      updSlots();
-    } else if(it.kind==='scope2'){
-      if(me.bag.s2+attCount('s2')>=2) return;
-      me.bag.s2++;
-      toast('2倍スコープを拾った!(バッグで装着)');
-      updBag();
-    } else if(it.kind==='scope4'){
-      if(me.bag.s4+attCount('s4')>=2) return;
-      me.bag.s4++;
-      toast('4倍スコープを拾った!(バッグで装着)');
-      updBag();
-    } else if(it.kind==='noz'){
-      if(me.bag.noz+attCount('noz')>=2) return;
-      me.bag.noz++;
-      toast('ノズルを拾った!連射UP(バッグで装着)');
-      updBag();
-    } else if(it.kind==='stk'){
-      if(me.bag.stk+attCount('stk')>=2) return;
-      me.bag.stk++;
-      toast('ストックを拾った!反動DOWN(バッグで装着)');
-      updBag();
-    } else {
-      let need=false;
-      for(const s of me.slots) if(s!==null && me.ammo[s]<WPN[s].ammo) need=true;
-      if(need){
-        for(const s of me.slots) if(s!==null) me.ammo[s]=WPN[s].ammo;
-        toast('弾薬フル補給!');
-        updSlots();
-      } else if(me.bag.ap<2){
-        me.bag.ap++;
-        toast('弾薬パックをバッグにストック!');
-        updBag();
-      } else return;
-    }
-    send({t:'pick',id});
-    sfxPick();
-    if(navigator.vibrate) navigator.vibrate(20);
-  }
+function deactivateItem(it){
   it.active=false;
   it.rt = it.kind==='smoke' ? 45 : (it.kind==='scope2'||it.kind==='scope4'||it.kind==='noz'||it.kind==='stk') ? 35 : 20;
   it.g.visible=false;
+}
+function consumeItem(it){
+  send({t:'pick',id:it.id});
+  sfxPick();
+  if(navigator.vibrate) navigator.vibrate(20);
+  deactivateItem(it);
+}
+function bagFullMsg(){ toast('バッグがいっぱい!(8スロット)'); sfxEmpty(); }
+// アタッチメントの自動装着(対応する武器の空き枠へ)
+function autoAttachKind(k){
+  if(k==='s2'||k==='s4'){
+    const want=k==='s2'?2:4;
+    for(const si of [0,1]){
+      const wid=me.slots[si];
+      if(wid!==null && WPN[wid].sc===want && !me.watt[si].scope){
+        me.watt[si].scope=want;
+        toast(WPN[wid].name+'に'+want+'倍スコープを自動装着!');
+        buildViewModel(); updBag();
+        return true;
+      }
+    }
+    return false;
+  }
+  for(const si of [0,1]){
+    const wid=me.slots[si];
+    if(wid!==null && !me.watt[si][k]){
+      me.watt[si][k]=true;
+      toast(WPN[wid].name+'に'+(k==='noz'?'ノズル(連射UP)':'ストック(反動DOWN)')+'を自動装着!');
+      buildViewModel(); updBag();
+      return true;
+    }
+  }
+  return false;
+}
+// 武器スワップモーダル
+let pendingGun=null;
+function openSwap(it){
+  pendingGun=it;
+  $('swapTitle').textContent=WPN[it.w].name+'('+WPN[it.w].cal+') を拾う — どの武器と入れ替える?';
+  const rows=$('swapRows');
+  rows.innerHTML='';
+  for(const si of [0,1]){
+    const b=document.createElement('button');
+    b.className='tOpt'; b.style.width='100%';
+    b.textContent=(si+1)+'. '+WPN[me.slots[si]].name+(me.sel===si?'(手持ち)':'');
+    const act=e=>{ e.preventDefault(); e.stopPropagation(); doSwap(si); };
+    b.addEventListener('touchstart',act,{passive:false});
+    b.addEventListener('mousedown',e=>{ e.stopPropagation(); doSwap(si); });
+    rows.append(b);
+  }
+  $('swapModal').style.display='flex';
+}
+function doSwap(si){
+  const it=pendingGun;
+  pendingGun=null;
+  $('swapModal').style.display='none';
+  if(!it || !it.active) return;
+  returnAtts(si);
+  if(me.rld===me.slots[si]) me.rld=null;
+  me.slots[si]=it.w;
+  me.ammo[it.w]=WPN[it.w].ammo;
+  me.mag[it.w]=WPN[it.w].mag;
+  toast(WPN[it.w].name+' に持ち替えた!');
+  if(me.sel===si) buildViewModel(); else updSlots();
+  updBag();
+  consumeItem(it);
+}
+function closeSwap(){ pendingGun=null; $('swapModal').style.display='none'; }
+
+function takeItem(id,mine){
+  const it=items[id];
+  if(!it || !it.active) return;
+  if(!mine){ deactivateItem(it); return; }
+  if(Math.hypot(it.x-me.x, it.z-me.z)>3.6) return;
+  if(it.kind==='gun'){
+    if(me.slots[0]===it.w || me.slots[1]===it.w){
+      if(me.ammo[it.w]>=WPN[it.w].ammo && me.mag[it.w]>=WPN[it.w].mag){ toast('弾は満タン!'); return; }
+      me.ammo[it.w]=WPN[it.w].ammo;
+      me.mag[it.w]=WPN[it.w].mag;
+      toast(WPN[it.w].name+'の弾を補給!');
+      updSlots(); consumeItem(it);
+    } else if(me.slots[0]===null || me.slots[1]===null){
+      const slot=me.slots[0]===null?0:1;
+      me.slots[slot]=it.w;
+      me.ammo[it.w]=WPN[it.w].ammo;
+      me.mag[it.w]=WPN[it.w].mag;
+      toast(WPN[it.w].name+' を拾った!(スロット'+(slot+1)+')');
+      if(me.sel===slot) buildViewModel(); else updSlots();
+      updBag(); consumeItem(it);
+    } else {
+      openSwap(it); // 2つ装備中 → 入れ替えモーダル
+    }
+    return;
+  }
+  if(it.kind==='nade'){
+    if(!bagAdd('nade',2)){ bagFullMsg(); return; }
+    toast('グレネード +2(バッグ)');
+  } else if(it.kind==='smoke'){
+    if(!bagAdd('smoke',1)){ bagFullMsg(); return; }
+    toast('レア!煙玉 +1(バッグ)');
+  } else if(it.kind==='heal'){
+    if(!bagAdd('heal',2)){ bagFullMsg(); return; }
+    toast('回復キット +2(バッグ)');
+  } else if(it.kind==='ammo'){
+    if(!bagAdd('ammo',60)){ bagFullMsg(); return; }
+    toast('弾薬 +60(バッグ)');
+  } else { // scope2/scope4/noz/stk → 自動装着、無理ならバッグへ
+    const k=it.kind==='scope2'?'s2':it.kind==='scope4'?'s4':it.kind;
+    if(!autoAttachKind(k)){
+      if(!bagAdd(k,1)){ bagFullMsg(); return; }
+      toast(ITEM_LBL[it.kind]+'をバッグへ');
+    }
+  }
+  updSlots(); updBag(); consumeItem(it);
 }
 
 // ---------------- 弾・グレネード ----------------
@@ -1638,9 +1798,9 @@ function startReload(wi){
 function sfxReload(){ if(!audioInit())return; tone({f:700,f2:500,dur:0.06,vol:0.2,type:'square'}); tone({f:1000,f2:800,dur:0.06,vol:0.2,type:'square',at:0.18}); }
 function fire(){
   if(me.sel===2){
-    if(me.nades<=0 || me.cd>0) return;
-    me.cd=1.1; me.nades--; me.prot=0; gunKick=1; sfxThrow(); updSlots();
-    if(me.nades===0){ me.sel=0; buildViewModel(); }
+    if(bagCount('nade')<=0 || me.cd>0) return;
+    me.cd=1.1; bagConsume('nade',1); me.prot=0; gunKick=1; sfxThrow(); updSlots(); updBag();
+    if(bagCount('nade')===0){ me.sel=0; buildViewModel(); }
     const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
     const origin=camera.position.clone().add(dir.clone().multiplyScalar(0.6));
     const vel=dir.multiplyScalar(15); vel.y+=3.5;
@@ -1650,9 +1810,9 @@ function fire(){
     return;
   }
   if(me.sel===3){
-    if(me.smokes<=0 || me.cd>0) return;
-    me.cd=1.2; me.smokes--; gunKick=1; sfxThrow(); updSlots();
-    if(me.smokes===0){ me.sel=0; buildViewModel(); }
+    if(bagCount('smoke')<=0 || me.cd>0) return;
+    me.cd=1.2; bagConsume('smoke',1); gunKick=1; sfxThrow(); updSlots(); updBag();
+    if(bagCount('smoke')===0){ me.sel=0; buildViewModel(); }
     const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
     const origin=camera.position.clone().add(dir.clone().multiplyScalar(0.6));
     const vel=dir.multiplyScalar(13); vel.y+=3.5;
@@ -1930,6 +2090,7 @@ addEventListener('keydown', e=>{ keys[e.code]=true;
   if(e.code==='KeyQ')setZoom(!me.zoom);
   if(e.code==='KeyC')setProne(!me.prone);
   if(e.code==='KeyR'&&me.sel<2&&me.slots[me.sel]!==null)startReload(me.slots[me.sel]);
+  if(e.code==='KeyE'&&state==='playing'){ const n=nearbyItems(); if(n.length) takeItem(n[0].it.id,true); }
   if(e.code==='KeyB')toggleBag(); });
 addEventListener('keyup', e=>{ keys[e.code]=false; });
 addEventListener('contextmenu', e=>e.preventDefault());
@@ -2027,7 +2188,6 @@ function loop(t){
       if(it.active){
         it.obj.rotation.y+=dt*1.6;
         it.obj.position.y=0.55+Math.sin(t*0.002+it.id)*0.12;
-        if(Math.hypot(it.x-me.x,it.z-me.z)<1.7) takeItem(it.id,true);
       } else if(it.rt>0){ it.rt-=dt; if(it.rt<=0){ it.active=true; it.g.visible=true; } }
     }
   }
@@ -2091,6 +2251,7 @@ function loop(t){
     b.g.rotation.z=Math.sin(b.ph*0.9)*0.08;
   }
   updateSmokeClouds(dt);
+  updatePickChips();
 
   updateProjectiles(dt);
   renderer.render(scene,camera);
