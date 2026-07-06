@@ -287,8 +287,10 @@ function scopeFits(k,wid){
   if(k==='s8') return c==='snp';
   return false;
 }
-const ITEM_LBL={nade:'グレネード',ammo:'弾薬',scope2:'2倍スコープ',scope4:'4倍スコープ',scope8:'8倍スコープ',smoke:'煙玉',noz:'ノズル',stk:'ストック',heal:'回復キット'};
-const STACK_CAP={ammo:60,nade:2,smoke:2,heal:4,s2:1,s4:1,s8:1,noz:1,stk:1};
+const ITEM_LBL={nade:'グレネード',ammo5:'5mm弾',ammo7:'7mm弾',ammo9:'9mm弾',
+  scope2:'2倍スコープ',scope4:'4倍スコープ',scope8:'8倍スコープ',smoke:'煙玉',noz:'ノズル',stk:'ストック',heal:'回復キット'};
+const STACK_CAP={ammo5:60,ammo7:60,ammo9:60,nade:2,smoke:2,heal:4,s2:1,s4:1,s8:1,noz:1,stk:1};
+const RES_CAP=240; // 予備弾の上限
 const BAG_SLOTS=8;
 const NADE_COL=0xe24b4a, AMMO_COL=0xffd166, NADE_MAX=4, SMOKE_MAX=2;
 const BALLOON_COLS=[0xe84b4a,0xffd166,0x5ad0a5,0x5aa5e8,0xf096b4,0xb78ae8];
@@ -888,7 +890,8 @@ function buildWorld(rng){
     }
     const col = kind==='gun'?WPN[w].col : kind==='nade'?NADE_COL :
       kind==='smoke'?0x9aa0b0 : kind==='scope2'?0x8ad0f0 : kind==='scope4'?0xb78ae8 : kind==='scope8'?0xf0d060 :
-      kind==='noz'?0xff9a3c : kind==='stk'?0xc08a50 : kind==='heal'?0x7ae87a : AMMO_COL;
+      kind==='noz'?0xff9a3c : kind==='stk'?0xc08a50 : kind==='heal'?0x7ae87a :
+      kind==='ammo5'?0xffd166 : kind==='ammo7'?0xff8a5a : kind==='ammo9'?0xd0d6de : AMMO_COL;
     const g=new THREE.Group();
     const beam=new THREE.Mesh(
       new THREE.CylinderGeometry(0.28,0.28,26,8,1,true),
@@ -950,7 +953,7 @@ function buildWorld(rng){
       obj.add(tube,lens);
     } else {
       const box=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.34,0.36), new THREE.MeshLambertMaterial({color:0x8a7444}));
-      const stripe=new THREE.Mesh(new THREE.BoxGeometry(0.52,0.1,0.38), new THREE.MeshLambertMaterial({color:AMMO_COL}));
+      const stripe=new THREE.Mesh(new THREE.BoxGeometry(0.52,0.1,0.38), new THREE.MeshLambertMaterial({color:col}));
       obj.add(box,stripe);
     }
     g.add(obj);
@@ -965,7 +968,9 @@ function buildWorld(rng){
   const GUNS=[1,3,4,2,5];
   for(let i=0;i<10;i++) addItem(id++,'gun',GUNS[i%5]);
   for(let i=0;i<5;i++) addItem(id++,'nade',0);
-  for(let i=0;i<5;i++) addItem(id++,'ammo',0);
+  for(let i=0;i<2;i++) addItem(id++,'ammo5',0);
+  for(let i=0;i<2;i++) addItem(id++,'ammo7',0);
+  for(let i=0;i<2;i++) addItem(id++,'ammo9',0);
   for(let i=0;i<4;i++) addItem(id++,'heal',0);
   for(let i=0;i<2;i++) addItem(id++,'scope2',0);
   for(let i=0;i<2;i++) addItem(id++,'scope4',0);
@@ -1286,7 +1291,9 @@ function updBag(){
   rows.append(sec);
   const grid=document.createElement('div'); grid.id='bagGrid';
   const INFO={
-    ammo:{ic:'📦',nm:'弾薬',act:'補給'},
+    ammo5:{ic:'📦',nm:'5mm弾',act:'補給'},
+    ammo7:{ic:'📦',nm:'7mm弾',act:'補給'},
+    ammo9:{ic:'📦',nm:'9mm弾',act:'補給'},
     nade:{ic:'💣',nm:'グレネード',act:''},
     smoke:{ic:'💨',nm:'煙玉',act:''},
     heal:{ic:'💊',nm:'回復キット',act:'+20'},
@@ -1304,18 +1311,17 @@ function updBag(){
       const inf=INFO[st.k];
       b.innerHTML=inf.ic+' '+inf.nm+'<br><small>×'+st.n+(inf.act?'・'+inf.act:'')+'</small>';
       const act=()=>{
-        if(st.k==='ammo'){
-          let need=0;
-          for(const s of me.slots) if(s!==null) need+=WPN[s].ammo-me.ammo[s];
-          if(need<=0){ toast('予備弾は満タン!'); return; }
-          let take=Math.min(st.n,need);
-          bagConsume('ammo',take);
+        if(st.k==='ammo5'||st.k==='ammo7'||st.k==='ammo9'){
+          const cal=st.k.slice(4)+'mm';
+          let matched=false;
+          for(const s of me.slots) if(s!==null && WPN[s].cal===cal) matched=true;
+          if(!matched){ toast(cal+'の武器を持っていない'); return; }
+          const take=st.n;
+          bagConsume(st.k,take);
           for(const s of me.slots){
-            if(s===null||take<=0) continue;
-            const t2=Math.min(WPN[s].ammo-me.ammo[s],take);
-            me.ammo[s]+=t2; take-=t2;
+            if(s!==null && WPN[s].cal===cal) me.ammo[s]=Math.min(RES_CAP, me.ammo[s]+take);
           }
-          toast('弾薬を補給!'); sfxPick(); updSlots(); updBag();
+          toast(cal+'弾を予備に追加!'); sfxPick(); updSlots(); updBag();
         } else if(st.k==='heal'){
           if(me.hp>=100){ toast('HPは満タン!'); return; }
           bagConsume('heal',1);
@@ -1615,7 +1621,15 @@ function grantBalloonReward(){
     }
   }
   if(bagAdd('heal',1)){ toast('🎈風船ボーナス!回復キット +1'); sfxPick(); updBag(); return; }
-  if(bagAdd('ammo',30)){ toast('🎈風船ボーナス!弾薬 +30'); sfxPick(); updBag(); return; }
+  for(const si of [0,1]){
+    const wid=me.slots[si];
+    if(wid!==null){
+      me.ammo[wid]=Math.min(RES_CAP, me.ammo[wid]+30);
+      toast('🎈風船ボーナス!'+WPN[wid].cal+'弾 +30');
+      sfxPick(); updSlots();
+      return;
+    }
+  }
   toast('🎈風船ボーナス!…バッグがいっぱいだった');
 }
 
@@ -1726,7 +1740,7 @@ function takeItem(id,mine){
   if(it.kind==='gun'){
     if(me.slots[0]===it.w || me.slots[1]===it.w){
       if(me.ammo[it.w]>=WPN[it.w].ammo && me.mag[it.w]>=WPN[it.w].mag){ toast('弾は満タン!'); return; }
-      me.ammo[it.w]=WPN[it.w].ammo;
+      me.ammo[it.w]=Math.max(me.ammo[it.w], WPN[it.w].ammo);
       me.mag[it.w]=WPN[it.w].mag;
       toast(WPN[it.w].name+'の弾を補給!');
       updSlots(); consumeItem(it);
@@ -1752,9 +1766,18 @@ function takeItem(id,mine){
   } else if(it.kind==='heal'){
     if(!bagAdd('heal',2)){ bagFullMsg(); return; }
     toast('回復キット +2(バッグ)');
-  } else if(it.kind==='ammo'){
-    if(!bagAdd('ammo',60)){ bagFullMsg(); return; }
-    toast('弾薬 +60(バッグ)');
+  } else if(it.kind==='ammo5'||it.kind==='ammo7'||it.kind==='ammo9'){
+    const cal=it.kind.slice(4)+'mm';
+    let matched=false;
+    for(const s of me.slots){
+      if(s!==null && WPN[s].cal===cal){ me.ammo[s]=Math.min(RES_CAP, me.ammo[s]+60); matched=true; }
+    }
+    if(matched){
+      toast(cal+'弾 +60!');
+    } else {
+      if(!bagAdd(it.kind,60)){ bagFullMsg(); return; }
+      toast(cal+'弾 +60(バッグ)— '+cal+'の武器を拾うと使える');
+    }
   } else { // scope2/4/8/noz/stk → アクティブ武器→もう片方の順で自動装着。両方装着済みなら拾えない
     const k=it.kind==='scope2'?'s2':it.kind==='scope4'?'s4':it.kind==='scope8'?'s8':it.kind;
     if(!autoAttachKind(k)){
@@ -2023,7 +2046,11 @@ function tone(o){
 function sfxShot(wi, vol){
   if(!audioInit()) return;
   vol=clamp(vol,0,1); if(vol<0.03) return;
-  const P=[{f:1500,d:0.17,th:150,tv:0.5},{f:2100,d:0.1,th:220,tv:0.32},{f:950,d:0.3,th:100,tv:0.7}][wi];
+  const c=(WPN[wi]||WPN[0]).cls;
+  const P = c==='snp' ? {f:950,d:0.3,th:100,tv:0.7}
+          : c==='smg' ? {f:2100,d:0.09,th:230,tv:0.3}
+          : c==='ar'  ? {f:1800,d:0.12,th:190,tv:0.4}
+          :             {f:1500,d:0.17,th:150,tv:0.5};
   burst({dur:P.d, vol:0.5*vol, f:P.f});
   burst({dur:P.d*0.5, vol:0.25*vol, f:3500, type:'highpass'});
   tone({dur:P.d+0.08, vol:P.tv*vol, f:P.th, f2:40, type:'triangle'});
@@ -2152,6 +2179,7 @@ function toast(s){ const t=$('toast'); t.textContent=s; t.style.opacity=1;
 let last=performance.now();
 function loop(t){
   if(state==='dead') return;
+  requestAnimationFrame(loop); // 先に予約(万一の例外でもゲームが止まらない)
   const dt=Math.min(0.05,(t-last)/1000); last=t;
   me.cd=Math.max(0,me.cd-dt); me.prot=Math.max(0,me.prot-dt); foe.prot=Math.max(0,foe.prot-dt);
   if(me.rld!==null && me.cd<=0){
@@ -2188,7 +2216,13 @@ function loop(t){
     // スティックを倒し切るとダッシュ、少し倒すと歩き
     const stickMag=Math.min(1, Math.hypot(f,s));
     const dash = stickMag>0.9;
-    const SP = (wading ? 3.8 : (dash ? 7.8 : 5.0))*(me.prone?0.35:1);
+    // 覗き込み中はクラス別に移動が遅くなる(SMG>AR>スナイパー)
+    let adsMul=1;
+    if(me.zoom && me.sel<2 && me.slots[me.sel]!==null){
+      const c=WPN[me.slots[me.sel]].cls;
+      adsMul = c==='snp'?0.3 : c==='ar'?0.55 : c==='smg'?0.8 : 0.7;
+    }
+    const SP = (wading ? 3.8 : (dash ? 7.8 : 5.0))*(me.prone?0.35:1)*adsMul;
     let nx=me.x+(-Math.sin(me.yaw)*f+Math.cos(me.yaw)*s)*SP*dt;
     let nz=me.z+(-Math.cos(me.yaw)*f-Math.sin(me.yaw)*s)*SP*dt;
     const rr=Math.hypot(nx,nz);
@@ -2233,9 +2267,13 @@ function loop(t){
   adsT+=(((me.zoom&&me.sel<2)?1:0)-adsT)*Math.min(1,dt*10);
   const hipX=me.sel>1?0.3:0.32, hipY=me.sel>1?-0.28:-0.3, hipZ=me.sel>1?-0.55:-0.65;
   const swayK=1-adsT*0.85;
+  // リロードの仕草: 銃を下に傾けて戻す
+  const rldP = (me.rld!==null && me.sel<2) ? Math.sin(clamp(1-me.cd/WPN[me.rld].rel,0,1)*Math.PI) : 0;
+  gunGroup.rotation.x=0.7*rldP;
+  gunGroup.rotation.z=0.15*rldP;
   gunGroup.position.x=hipX*(1-adsT)+Math.sin(bobPhase)*0.015*walkAmp*swayK;
-  gunGroup.position.y=hipY*(1-adsT)-0.165*adsT-gunKick*0.02+Math.abs(Math.cos(bobPhase))*0.008*walkAmp*swayK;
-  gunGroup.position.z=hipZ*(1-adsT)-0.5*adsT+gunKick*0.09;
+  gunGroup.position.y=hipY*(1-adsT)-0.165*adsT-gunKick*0.02+Math.abs(Math.cos(bobPhase))*0.008*walkAmp*swayK-0.12*rldP;
+  gunGroup.position.z=hipZ*(1-adsT)-0.5*adsT+gunKick*0.09+0.06*rldP;
 
   const k=Math.min(1,dt*10);
   foe.x+=(foe.tx-foe.x)*k; foe.z+=(foe.tz-foe.z)*k; foe.a+=norm(foe.ta-foe.a)*k;
@@ -2285,7 +2323,6 @@ function loop(t){
 
   updateProjectiles(dt);
   renderer.render(scene,camera);
-  requestAnimationFrame(loop);
 }
 </script>
 </body>
