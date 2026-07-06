@@ -50,11 +50,11 @@
   #hitmark::before { left:50%; top:0; width:3px; height:100%; transform:translateX(-50%); }
   #hitmark::after  { top:50%; left:0; height:3px; width:100%; transform:translateY(-50%); }
   #dmgFlash { inset:0; background:radial-gradient(ellipse at center, transparent 40%, rgba(226,60,60,0.55)); opacity:0; }
-  #hpBar { left:50%; bottom:calc(10px + env(safe-area-inset-bottom)); transform:translateX(-50%);
-    width:300px; background:rgba(8,10,16,0.55); border-radius:10px; padding:5px 12px; }
-  #hpBar .nm { font-size:11px; font-weight:700; text-align:center; }
-  #hpBar .tr { height:10px; background:#0b0d12; border-radius:5px; margin-top:3px; overflow:hidden; }
-  #hpBar .fl { height:100%; width:100%; background:#639922; border-radius:5px; transition:width 0.12s; }
+  #hpBar { left:50%; bottom:calc(8px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+    width:220px; background:rgba(8,10,16,0.35); border-radius:9px; padding:3px 10px; }
+  #hpBar .nm { font-size:10px; font-weight:700; text-align:center; color:rgba(255,255,255,0.85); }
+  #hpBar .tr { height:8px; background:rgba(11,13,18,0.6); border-radius:4px; margin-top:2px; overflow:hidden; }
+  #hpBar .fl { height:100%; width:100%; background:#639922; border-radius:4px; transition:width 0.12s; }
   #score { top:calc(10px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
     background:rgba(8,10,16,0.7); border-radius:10px; padding:5px 14px; font-size:14px; font-weight:700; white-space:nowrap; }
   #msg { top:calc(52px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
@@ -75,11 +75,11 @@
     color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:13px; z-index:21; touch-action:none; }
   #adsBtn.on { background:rgba(45,123,196,0.68); }
   #adsBtn:disabled { opacity:0.3; }
-  #bagBtn { position:absolute; left:calc(50% - 150px - 54px); bottom:calc(8px + env(safe-area-inset-bottom));
-    width:48px; height:48px; border-radius:50%; background:rgba(255,209,102,0.2); border:2px solid rgba(255,209,102,0.55);
+  #bagBtn { position:absolute; left:calc(50% - 110px - 50px); bottom:calc(6px + env(safe-area-inset-bottom));
+    width:44px; height:44px; border-radius:50%; background:rgba(255,209,102,0.2); border:2px solid rgba(255,209,102,0.55);
     color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:10px; z-index:21; touch-action:none; }
-  #proneBtn { position:absolute; left:calc(50% + 150px + 6px); bottom:calc(8px + env(safe-area-inset-bottom));
-    width:48px; height:48px; border-radius:50%; background:rgba(99,153,34,0.22); border:2px solid rgba(140,190,80,0.6);
+  #proneBtn { position:absolute; left:calc(50% + 110px + 6px); bottom:calc(6px + env(safe-area-inset-bottom));
+    width:44px; height:44px; border-radius:50%; background:rgba(99,153,34,0.22); border:2px solid rgba(140,190,80,0.6);
     color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:10px; z-index:21; touch-action:none; }
   #proneBtn.on { background:rgba(99,153,34,0.65); }
   #scopeOv { display:none; position:absolute; inset:0; z-index:9; pointer-events:none;
@@ -106,13 +106,20 @@
     width:86px; height:86px; border-radius:50%; background:rgba(226,75,74,0.32); border:2.5px solid rgba(240,149,149,0.75);
     color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:15px; z-index:21; touch-action:none; }
   #fireBtn.on { background:rgba(226,75,74,0.62); }
-  #slots { position:absolute; left:50%; bottom:calc(62px + env(safe-area-inset-bottom));
-    transform:translateX(-50%); display:flex; gap:8px; z-index:21; }
-  .slot { width:84px; height:48px; border-radius:12px; border:2px solid rgba(255,255,255,0.25);
-    background:rgba(8,10,16,0.6); color:#fff; font-family:inherit; font-weight:700; font-size:11px;
-    line-height:1.25; touch-action:none; }
-  .slot.sel { border-color:#ffd166; background:rgba(60,48,12,0.7); }
+  #slots { position:absolute; left:50%; bottom:calc(46px + env(safe-area-inset-bottom));
+    transform:translateX(-50%); display:flex; gap:6px; z-index:21; }
+  .slot { width:74px; height:36px; border-radius:9px; border:1.5px solid rgba(255,255,255,0.18);
+    background:rgba(8,10,16,0.32); color:rgba(255,255,255,0.88); font-family:inherit; font-weight:700;
+    font-size:10px; line-height:1.2; touch-action:none; }
+  .slot.sel { border-color:rgba(255,209,102,0.85); background:rgba(60,48,12,0.42); }
   .slot.empty { color:rgba(255,255,255,0.3); }
+  #throwBtn { position:absolute; left:calc(50% + 80px); bottom:calc(46px + env(safe-area-inset-bottom));
+    width:66px; z-index:21; }
+  #throwMenu { position:absolute; left:calc(50% + 80px); bottom:calc(88px + env(safe-area-inset-bottom));
+    display:none; flex-direction:column; gap:5px; z-index:22; }
+  .tOpt { width:118px; height:36px; border-radius:9px; border:1.5px solid rgba(255,255,255,0.35);
+    background:rgba(8,10,16,0.85); color:#fff; font-family:inherit; font-weight:700; font-size:11px; touch-action:none; }
+  .tOpt:disabled { color:#5a6070; border-color:rgba(255,255,255,0.12); }
   #overlay { position:absolute; inset:0; background:rgba(8,10,16,0.78); display:none; flex-direction:column;
     align-items:center; justify-content:center; gap:20px; z-index:40; }
   #overTitle { font-size:32px; font-weight:700; }
@@ -174,8 +181,11 @@
   <div id="slots">
     <button class="slot sel" id="slot0">ピストル</button>
     <button class="slot empty" id="slot1">ー</button>
-    <button class="slot empty" id="slot2">グレネード<br>×0</button>
-    <button class="slot empty" id="slot3">煙玉<br>×0</button>
+  </div>
+  <button class="slot empty" id="throwBtn">投げ物</button>
+  <div id="throwMenu">
+    <button class="tOpt" id="tOptN">グレネード ×0</button>
+    <button class="tOpt" id="tOptS">煙玉 ×0</button>
   </div>
   <div id="bagPanel">
     <h3>アイテムバッグ</h3>
@@ -994,19 +1004,18 @@ function slotLabel(si){
   return (me.watt[si].scope?'🔭':'')+WPN[wid].name+'<br>×'+me.ammo[wid];
 }
 function updSlots(){
-  const s0=$('slot0'), s1=$('slot1'), s2=$('slot2'), s3=$('slot3');
+  const s0=$('slot0'), s1=$('slot1'), tb=$('throwBtn');
   s0.innerHTML = slotLabel(0);
   s1.innerHTML = slotLabel(1);
-  s2.innerHTML = 'グレネード<br>×'+me.nades;
-  s3.innerHTML = '煙玉<br>×'+me.smokes;
+  tb.innerHTML = me.sel===2 ? 'グレネード<br>×'+me.nades
+               : me.sel===3 ? '煙玉<br>×'+me.smokes
+               : '投げ物<br>💣'+me.nades+' 💨'+me.smokes;
   s0.classList.toggle('empty', me.slots[0]===null || me.ammo[me.slots[0]]===0);
   s1.classList.toggle('empty', me.slots[1]===null || (me.slots[1]!==null&&me.ammo[me.slots[1]]===0));
-  s2.classList.toggle('empty', me.nades===0);
-  s3.classList.toggle('empty', me.smokes===0);
+  tb.classList.toggle('empty', me.nades===0 && me.smokes===0);
   s0.classList.toggle('sel', me.sel===0);
   s1.classList.toggle('sel', me.sel===1);
-  s2.classList.toggle('sel', me.sel===2);
-  s3.classList.toggle('sel', me.sel===3);
+  tb.classList.toggle('sel', me.sel>=2);
   const cnt = me.sel===2 ? me.nades : me.sel===3 ? me.smokes : me.ammo[me.slots[me.sel]];
   $('ammoCnt').textContent='×'+cnt;
   $('ammoCnt').style.color = cnt===0 ? '#f09595' : '#ffd98a';
@@ -1016,15 +1025,32 @@ function selectSlot(i){
   if(i===2){ if(me.nades<=0&&me.sel!==2) return; }
   else if(i===3){ if(me.smokes<=0&&me.sel!==3) return; }
   else if(me.slots[i]===null) return;
+  $('throwMenu').style.display='none';
   if(me.sel===i) return;
   me.sel=i; setZoom(false); buildViewModel();
   if(navigator.vibrate) navigator.vibrate(10);
 }
-for(const i of [0,1,2,3]){
+for(const i of [0,1]){
   const el=$('slot'+i);
   el.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); selectSlot(i); },{passive:false});
   el.addEventListener('mousedown',  e=>{ e.stopPropagation(); selectSlot(i); });
 }
+// 投げ物セレクター
+function toggleThrowMenu(show){
+  const m=$('throwMenu');
+  const on = show===undefined ? m.style.display!=='flex' : show;
+  if(on){
+    $('tOptN').textContent='グレネード ×'+me.nades; $('tOptN').disabled=me.nades<=0;
+    $('tOptS').textContent='煙玉 ×'+me.smokes; $('tOptS').disabled=me.smokes<=0;
+    m.style.display='flex';
+  } else m.style.display='none';
+}
+$('throwBtn').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); toggleThrowMenu(); },{passive:false});
+$('throwBtn').addEventListener('mousedown',  e=>{ e.stopPropagation(); toggleThrowMenu(); });
+$('tOptN').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); selectSlot(2); },{passive:false});
+$('tOptN').addEventListener('mousedown',  e=>{ e.stopPropagation(); selectSlot(2); });
+$('tOptS').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); selectSlot(3); },{passive:false});
+$('tOptS').addEventListener('mousedown',  e=>{ e.stopPropagation(); selectSlot(3); });
 $('adsBtn').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); setZoom(!me.zoom); },{passive:false});
 $('adsBtn').addEventListener('mousedown',  e=>{ e.stopPropagation(); setZoom(!me.zoom); });
 
@@ -1297,6 +1323,7 @@ function popBalloon(id,mine){
     myBalloons++;
     send({t:'bpop',id});
     updScore();
+    if(myBalloons%10===0) grantBalloonReward();
     if(!training && myBalloons>=BALLOON_WIN) gameOver(true);
   } else {
     foeBalloons++;
@@ -1347,6 +1374,33 @@ function hitDummy(dm,dmg,pos){
     sfxPop(0.7);
     dm.mesh.visible=false;
   }
+}
+
+// 風船10個ごとのごほうび: 武器に自動でアタッチメントが付く
+function grantBalloonReward(){
+  for(const kind of ['noz','stk']){
+    for(const si of [0,1]){
+      if(me.slots[si]!==null && !me.watt[si][kind]){
+        me.watt[si][kind]=true;
+        toast('🎈風船ボーナス!'+WPN[me.slots[si]].name+'に'+(kind==='noz'?'ノズル(連射UP)':'ストック(反動DOWN)')+'が付いた!');
+        sfxPick(); buildViewModel(); updBag();
+        return;
+      }
+    }
+  }
+  for(const si of [0,1]){
+    const wid=me.slots[si];
+    if((wid===1||wid===2) && !me.watt[si].scope){
+      me.watt[si].scope = wid===1?2:4;
+      toast('🎈風船ボーナス!'+WPN[wid].name+'に'+(wid===1?2:4)+'倍スコープが付いた!');
+      sfxPick(); buildViewModel(); updBag();
+      return;
+    }
+  }
+  if(me.bag.ap<2){ me.bag.ap++; toast('🎈風船ボーナス!弾薬パック +1'); sfxPick(); updBag(); return; }
+  me.nades=Math.min(NADE_MAX, me.nades+1);
+  toast('🎈風船ボーナス!グレネード +1');
+  sfxPick(); updSlots();
 }
 
 // ---------------- 煙幕 ----------------
