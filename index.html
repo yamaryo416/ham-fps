@@ -88,11 +88,18 @@
     background:rgba(10,13,20,0.95); border:1.5px solid #3a3f4e; border-radius:16px; padding:14px;
     z-index:45; flex-direction:column; gap:9px; width:min(430px,94vw); max-height:88vh; overflow-y:auto; }
   #bagPanel h3 { font-size:15px; text-align:center; }
-  .wcard { border:2px solid #3a3f4e; border-radius:12px; padding:9px 12px;
-    display:flex; flex-direction:column; gap:7px; background:rgba(255,255,255,0.03); }
-  .wcard .wtitle { display:flex; align-items:baseline; gap:10px; }
-  .wcard .wname { font-size:19px; font-weight:700; }
-  .wcard .wammo { font-size:12px; color:#9aa0b0; }
+  #wcards { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .wcard { border:2px solid #3a3f4e; border-radius:11px; padding:7px 9px;
+    display:flex; flex-direction:column; gap:4px; background:rgba(255,255,255,0.03); }
+  .wcard .wname { font-size:14px; font-weight:700; }
+  .wcard .wammo { font-size:10px; color:#9aa0b0; }
+  .attIcons { display:flex; gap:5px; min-height:34px; }
+  .aIcon { width:36px; height:34px; border-radius:8px; border:1.5px dashed #3a3f4e;
+    background:rgba(255,255,255,0.04); color:#fff; font-size:15px; font-family:inherit;
+    position:relative; touch-action:manipulation; }
+  .aIcon:disabled { opacity:0.28; }
+  .aIcon.on { border-style:solid; border-color:#ffd166; background:rgba(255,209,102,0.16); opacity:1; }
+  .aIcon small { position:absolute; bottom:0; right:2px; font-size:8px; color:#ffd166; }
   .attRow { display:flex; gap:7px; flex-wrap:wrap; }
   .chip { font-family:inherit; font-weight:700; font-size:12px; padding:7px 11px; border-radius:10px;
     border:1.5px solid #5aa5e8; background:rgba(45,123,196,0.25); color:#fff; touch-action:manipulation; }
@@ -265,15 +272,23 @@ function lostConn(){ if(state==='dead')return; state='dead'; show('lostScreen');
 // ---------------- 定義 ----------------
 const PLAY_R=110, EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
 const WPN=[
-  {name:'G18',   cal:'9mm', dmg:20, cd:0.42, spd:70,  col:0x9aa3b2, spread:0.008, ammo:36, mag:12, rel:1.1, recoil:0.025, sc:0},
-  {name:'M416',  cal:'5mm', dmg:13, cd:0.14, spd:75,  col:0x5ad0a5, spread:0.018, ammo:60, mag:30, rel:1.6, recoil:0.013, sc:2},
-  {name:'Kar98', cal:'7mm', dmg:42, cd:0.9,  spd:120, col:0xf0a54a, spread:0.003, ammo:15, mag:5,  rel:2.0, recoil:0.06,  sc:4},
-  {name:'UMP',   cal:'9mm', dmg:10, cd:0.11, spd:65,  col:0x5ab8d0, spread:0.022, ammo:75, mag:25, rel:1.4, recoil:0.011, sc:2},
-  {name:'M16',   cal:'5mm', dmg:17, cd:0.19, spd:85,  col:0xd08a5a, spread:0.014, ammo:48, mag:20, rel:1.7, recoil:0.018, sc:2},
-  {name:'AWM',   cal:'7mm', dmg:55, cd:1.3,  spd:140, col:0xb78ae8, spread:0.002, ammo:9,  mag:3,  rel:2.4, recoil:0.08,  sc:4}
+  {name:'G18',   cal:'9mm', cls:'pst', dmg:20, cd:0.42, spd:70,  col:0x9aa3b2, spread:0.008, ammo:36, mag:12, rel:1.1, recoil:0.025},
+  {name:'M416',  cal:'5mm', cls:'ar',  dmg:13, cd:0.14, spd:75,  col:0x5ad0a5, spread:0.018, ammo:60, mag:30, rel:1.6, recoil:0.013},
+  {name:'Kar98', cal:'7mm', cls:'snp', dmg:42, cd:0.9,  spd:120, col:0xf0a54a, spread:0.003, ammo:15, mag:5,  rel:2.0, recoil:0.06},
+  {name:'UMP',   cal:'9mm', cls:'smg', dmg:10, cd:0.11, spd:65,  col:0x5ab8d0, spread:0.022, ammo:75, mag:25, rel:1.4, recoil:0.011},
+  {name:'M16',   cal:'5mm', cls:'ar',  dmg:17, cd:0.19, spd:85,  col:0xd08a5a, spread:0.014, ammo:48, mag:20, rel:1.7, recoil:0.018},
+  {name:'AWM',   cal:'7mm', cls:'snp', dmg:55, cd:1.3,  spd:140, col:0xb78ae8, spread:0.002, ammo:9,  mag:3,  rel:2.4, recoil:0.08}
 ];
-const ITEM_LBL={nade:'グレネード',ammo:'弾薬',scope2:'2倍スコープ',scope4:'4倍スコープ',smoke:'煙玉',noz:'ノズル',stk:'ストック',heal:'回復キット'};
-const STACK_CAP={ammo:60,nade:2,smoke:2,heal:4,s2:1,s4:1,noz:1,stk:1};
+// スコープ対応: 2倍=SMG/AR/スナイパー, 4倍=AR/スナイパー, 8倍=スナイパーのみ
+function scopeFits(k,wid){
+  const c=WPN[wid].cls;
+  if(k==='s2') return c==='smg'||c==='ar'||c==='snp';
+  if(k==='s4') return c==='ar'||c==='snp';
+  if(k==='s8') return c==='snp';
+  return false;
+}
+const ITEM_LBL={nade:'グレネード',ammo:'弾薬',scope2:'2倍スコープ',scope4:'4倍スコープ',scope8:'8倍スコープ',smoke:'煙玉',noz:'ノズル',stk:'ストック',heal:'回復キット'};
+const STACK_CAP={ammo:60,nade:2,smoke:2,heal:4,s2:1,s4:1,s8:1,noz:1,stk:1};
 const BAG_SLOTS=8;
 const NADE_COL=0xe24b4a, AMMO_COL=0xffd166, NADE_MAX=4, SMOKE_MAX=2;
 const BALLOON_COLS=[0xe84b4a,0xffd166,0x5ad0a5,0x5aa5e8,0xf096b4,0xb78ae8];
@@ -589,9 +604,10 @@ function buildWorld(rng){
       }
     }
     if(factory){
-      // 屋上スラブ+パラペット+煙突(屋上に上がれる)
-      box(W*2+0.6,0.22,D*2+0.6, 0,H+0.11,0, wallMatB);
-      platforms.push({x0:cx-W,x1:cx+W, z0:cz-D,z1:cz+D, y0:base+H+0.22, y1:base+H+0.22});
+      // 屋上スラブ(西側のランプ通路上は開口=ここから降りられる)+パラペット+煙突
+      const rx0=-W+2.5;
+      box(W+0.3-rx0,0.22,D*2+0.6, (rx0+W+0.3)/2,H+0.11,0, wallMatB);
+      platforms.push({x0:cx+rx0,x1:cx+W, z0:cz-D,z1:cz+D, y0:base+H+0.22, y1:base+H+0.22});
       for(const sx of[-1,1]) box(0.3,0.6,D*2+0.6, sx*(W+0.15),H+0.5,0, wallMatB);
       for(const sz of[-1,1]) box(W*2+0.6,0.6,0.3, 0,H+0.5,sz*(D+0.15), wallMatB);
       const chim=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.75,3.2,8), new THREE.MeshLambertMaterial({color:0x707880}));
@@ -609,7 +625,7 @@ function buildWorld(rng){
       const r2z0=-D+0.8, r2z1=D-0.8, r2len=r2z1-r2z0, rise=H-H1;
       const ramp2=box(2.1,0.18,Math.hypot(r2len,rise), -W+1.3,(H1+H)/2,(r2z0+r2z1)/2, wallMatB);
       ramp2.rotation.x=-Math.atan2(rise,r2len);
-      platforms.push({x0:cx-W+0.2,x1:cx-W+2.4, z0:cz+r2z0,z1:cz+r2z1, axis:'z', y0:base+H1+0.12, y1:base+H+0.22});
+      platforms.push({x0:cx-W+0.2,x1:cx-W+2.6, z0:cz+r2z0,z1:cz+r2z1, axis:'z', y0:base+H1+0.12, y1:base+H+0.22});
       // 屋上への開口: 屋根スラブに穴は開けない(ランプ上端が屋上高さに接続)
       const crateM=new THREE.MeshLambertMaterial({color:0x8a6238});
       for(const [ox,oz] of [[4,-2.5],[6,1.5],[8.5,-4]]){
@@ -871,7 +887,7 @@ function buildWorld(rng){
       if(groundY(x,z)>WATER_Y+0.6) break;
     }
     const col = kind==='gun'?WPN[w].col : kind==='nade'?NADE_COL :
-      kind==='smoke'?0x9aa0b0 : kind==='scope2'?0x8ad0f0 : kind==='scope4'?0xb78ae8 :
+      kind==='smoke'?0x9aa0b0 : kind==='scope2'?0x8ad0f0 : kind==='scope4'?0xb78ae8 : kind==='scope8'?0xf0d060 :
       kind==='noz'?0xff9a3c : kind==='stk'?0xc08a50 : kind==='heal'?0x7ae87a : AMMO_COL;
     const g=new THREE.Group();
     const beam=new THREE.Mesh(
@@ -881,7 +897,7 @@ function buildWorld(rng){
     const obj=new THREE.Group();
     const LM=c=>new THREE.MeshLambertMaterial({color:c});
     if(kind==='gun'){
-      if(WPN[w].sc!==4){ // AR/SMG系: コンパクト+マガジン
+      if(WPN[w].cls!=='snp'){ // AR/SMG系: コンパクト+マガジン
         const body=new THREE.Mesh(new THREE.BoxGeometry(0.75,0.24,0.18), LM(col));
         const mag=new THREE.Mesh(new THREE.BoxGeometry(0.15,0.32,0.16), LM(0x333844));
         mag.position.set(0.06,-0.26,0);
@@ -926,7 +942,7 @@ function buildWorld(rng){
       const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x788088}));
       const band=new THREE.Mesh(new THREE.CylinderGeometry(0.245,0.245,0.08,10,1,true), new THREE.MeshLambertMaterial({color:0xe8e8e8}));
       obj.add(b,band);
-    } else if(kind==='scope2'||kind==='scope4'){
+    } else if(kind==='scope2'||kind==='scope4'||kind==='scope8'){
       const tube=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.12,0.5,8), new THREE.MeshLambertMaterial({color:0x2c313c}));
       tube.rotation.z=Math.PI/2;
       const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.02,8), new THREE.MeshBasicMaterial({color:col}));
@@ -953,6 +969,7 @@ function buildWorld(rng){
   for(let i=0;i<4;i++) addItem(id++,'heal',0);
   for(let i=0;i<2;i++) addItem(id++,'scope2',0);
   for(let i=0;i<2;i++) addItem(id++,'scope4',0);
+  addItem(id++,'scope8',0);
   for(let i=0;i<3;i++) addItem(id++,'smoke',0);
   for(let i=0;i<2;i++) addItem(id++,'noz',0);
   for(let i=0;i<2;i++) addItem(id++,'stk',0);
@@ -1075,7 +1092,7 @@ function buildViewModel(){
       const sc=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.04,0.18,8), new THREE.MeshLambertMaterial({color:0x22262e}));
       sc.rotation.x=Math.PI/2; sc.position.set(0,0.1,-0.06);
       const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.028,0.012,8),
-        new THREE.MeshBasicMaterial({color:wa.scope===2?0x8ad0f0:0xb78ae8}));
+        new THREE.MeshBasicMaterial({color:wa.scope===2?0x8ad0f0:wa.scope===4?0xb78ae8:0xf0d060}));
       lens.rotation.x=Math.PI/2; lens.position.set(0,0.1,-0.155);
       gunGroup.add(sc,lens);
     }
@@ -1211,7 +1228,7 @@ function detach(si,kind){
   const a=me.watt[si];
   if(kind==='scope'){
     if(!a.scope) return;
-    if(!bagAdd(a.scope===2?'s2':'s4',1)){ bagFullMsg(); return; }
+    if(!bagAdd(a.scope===2?'s2':a.scope===4?'s4':'s8',1)){ bagFullMsg(); return; }
     a.scope=null; setZoom(false);
   } else {
     if(!a[kind]) return;
@@ -1223,41 +1240,46 @@ function detach(si,kind){
 function attach(kind){
   if(bagCount(kind)<=0) return;
   if(autoAttachKind(kind)){ bagConsume(kind,1); sfxPick(); updBag(); updSlots(); }
-  else toast(kind==='s2'?'2倍スコープが付く武器がない(AR/SMG系)':kind==='s4'?'4倍スコープが付く武器がない(スナイパー系)':'装着できる武器がない');
+  else toast(kind==='s2'?'2倍が付く武器がない(SMG/AR/スナイパー)':kind==='s4'?'4倍が付く武器がない(AR/スナイパー)':kind==='s8'?'8倍が付く武器がない(スナイパー)':'装着できる武器がない');
 }
 function updBag(){
   const rows=$('bagRows');
   rows.innerHTML='';
-  // 装備中の武器カード×2
+  // 装備中の武器カード×2(横並び・アイコン式)
+  const wcards=document.createElement('div'); wcards.id='wcards';
+  function aIcon(icon, on, sub, fn){
+    const b=document.createElement('button');
+    b.className='aIcon'+(on?' on':'');
+    b.innerHTML=icon+(sub?'<small>'+sub+'</small>':'');
+    if(on && fn){
+      b.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); fn(); },{passive:false});
+      b.addEventListener('mousedown', e=>{ e.stopPropagation(); fn(); });
+    }
+    if(!on) b.disabled=true;
+    return b;
+  }
   for(const si of [0,1]){
     const wid=me.slots[si], a=me.watt[si];
     const card=document.createElement('div'); card.className='wcard';
-    const title=document.createElement('div'); title.className='wtitle';
     const nm=document.createElement('div'); nm.className='wname';
-    nm.textContent=(si+1)+'. '+(wid===null?'(武器なし)':WPN[wid].name);
-    if(wid!==null){ nm.style.color='#'+WPN[wid].col.toString(16).padStart(6,'0');
-      card.style.borderColor='#'+WPN[wid].col.toString(16).padStart(6,'0'); }
+    nm.textContent=wid===null?'(武器なし)':WPN[wid].name;
+    if(wid!==null){
+      nm.style.color='#'+WPN[wid].col.toString(16).padStart(6,'0');
+      card.style.borderColor='#'+WPN[wid].col.toString(16).padStart(6,'0');
+    }
     const am=document.createElement('div'); am.className='wammo';
     am.textContent=wid!==null?WPN[wid].cal+'弾 '+me.mag[wid]+'/'+me.ammo[wid]:'';
-    title.append(nm,am);
-    card.append(title);
-    const row=document.createElement('div'); row.className='attRow';
-    if(wid===null){
-      row.append(chip('武器を拾うとここに表示','empty'));
-    } else {
-      // スコープ枠
-      if(a.scope) row.append(chip('🔭 '+a.scope+'倍スコープ ✕', '', ()=>detach(si,'scope')));
-      else row.append(chip(WPN[wid].sc===0?'スコープ不可':'スコープなし('+WPN[wid].sc+'倍対応)','empty'));
-      // ノズル枠
-      if(a.noz) row.append(chip('🔩 ノズル ✕', '', ()=>detach(si,'noz')));
-      else row.append(chip('ノズルなし','empty'));
-      // ストック枠
-      if(a.stk) row.append(chip('🪵 ストック ✕', '', ()=>detach(si,'stk')));
-      else row.append(chip('ストックなし','empty'));
+    card.append(nm,am);
+    const row=document.createElement('div'); row.className='attIcons';
+    if(wid!==null){
+      row.append(aIcon('🔭', !!a.scope, a.scope?('×'+a.scope):'', ()=>detach(si,'scope')));
+      row.append(aIcon('🔩', a.noz, '', ()=>detach(si,'noz')));
+      row.append(aIcon('🪵', a.stk, '', ()=>detach(si,'stk')));
     }
     card.append(row);
-    rows.append(card);
+    wcards.append(card);
   }
+  rows.append(wcards);
   // バッグの中身(8スロット・スタック制)
   const sec=document.createElement('div'); sec.className='bagSec';
   sec.textContent='バッグ('+me.bag.length+'/'+BAG_SLOTS+'スロット)— タップで使用/装着';
@@ -1270,6 +1292,7 @@ function updBag(){
     heal:{ic:'💊',nm:'回復キット',act:'+20'},
     s2:{ic:'🔭',nm:'2倍スコープ',act:'装着'},
     s4:{ic:'🔭',nm:'4倍スコープ',act:'装着'},
+    s8:{ic:'🔭',nm:'8倍スコープ',act:'装着'},
     noz:{ic:'🔩',nm:'ノズル',act:'装着'},
     stk:{ic:'🪵',nm:'ストック',act:'装着'}
   };
@@ -1298,7 +1321,7 @@ function updBag(){
           bagConsume('heal',1);
           me.hp=Math.min(100,me.hp+20);
           toast('回復!+20'); sfxPick(); updBars(); updBag();
-        } else if(st.k==='s2'||st.k==='s4'||st.k==='noz'||st.k==='stk'){
+        } else if(st.k==='s2'||st.k==='s4'||st.k==='s8'||st.k==='noz'||st.k==='stk'){
           attach(st.k);
         } else {
           toast('投げ物は右下の「投げ物」ボタンで使おう');
@@ -1426,7 +1449,7 @@ function resetLoadout(){
 }
 function returnAtts(si){
   const a=me.watt[si];
-  if(a.scope){ if(!bagAdd(a.scope===2?'s2':'s4',1)) toast('バッグがいっぱいでスコープを失った…'); a.scope=null; }
+  if(a.scope){ if(!bagAdd(a.scope===2?'s2':a.scope===4?'s4':'s8',1)) toast('バッグがいっぱいでスコープを失った…'); a.scope=null; }
   if(a.noz){ if(!bagAdd('noz',1)) toast('バッグがいっぱいでノズルを失った…'); a.noz=false; }
   if(a.stk){ if(!bagAdd('stk',1)) toast('バッグがいっぱいでストックを失った…'); a.stk=false; }
 }
@@ -1583,9 +1606,10 @@ function grantBalloonReward(){
   }
   for(const si of [0,1]){
     const wid=me.slots[si];
-    if(wid!==null && WPN[wid].sc>0 && !me.watt[si].scope){
-      me.watt[si].scope = WPN[wid].sc;
-      toast('🎈風船ボーナス!'+WPN[wid].name+'に'+WPN[wid].sc+'倍スコープが付いた!');
+    if(wid!==null && scopeFits('s2',wid) && !me.watt[si].scope){
+      const sv=WPN[wid].cls==='snp'?4:2;
+      me.watt[si].scope=sv;
+      toast('🎈風船ボーナス!'+WPN[wid].name+'に'+sv+'倍スコープが付いた!');
       sfxPick(); buildViewModel(); updBag();
       return;
     }
@@ -1621,7 +1645,7 @@ function updateSmokeClouds(dt){
 
 function deactivateItem(it){
   it.active=false;
-  it.rt = it.kind==='smoke' ? 45 : (it.kind==='scope2'||it.kind==='scope4'||it.kind==='noz'||it.kind==='stk') ? 35 : 20;
+  it.rt = (it.kind==='smoke'||it.kind==='scope8') ? 45 : (it.kind==='scope2'||it.kind==='scope4'||it.kind==='noz'||it.kind==='stk') ? 35 : 20;
   it.g.visible=false;
 }
 function consumeItem(it){
@@ -1633,11 +1657,13 @@ function consumeItem(it){
 function bagFullMsg(){ toast('バッグがいっぱい!(8スロット)'); sfxEmpty(); }
 // アタッチメントの自動装着(対応する武器の空き枠へ)
 function autoAttachKind(k){
-  if(k==='s2'||k==='s4'){
-    const want=k==='s2'?2:4;
-    for(const si of [0,1]){
+  // アクティブな武器を優先、次にもう片方
+  const order = me.sel<2 ? [me.sel, 1-me.sel] : [0,1];
+  if(k==='s2'||k==='s4'||k==='s8'){
+    const want=k==='s2'?2:k==='s4'?4:8;
+    for(const si of order){
       const wid=me.slots[si];
-      if(wid!==null && WPN[wid].sc===want && !me.watt[si].scope){
+      if(wid!==null && scopeFits(k,wid) && !me.watt[si].scope){
         me.watt[si].scope=want;
         toast(WPN[wid].name+'に'+want+'倍スコープを自動装着!');
         buildViewModel(); updBag();
@@ -1646,7 +1672,7 @@ function autoAttachKind(k){
     }
     return false;
   }
-  for(const si of [0,1]){
+  for(const si of order){
     const wid=me.slots[si];
     if(wid!==null && !me.watt[si][k]){
       me.watt[si][k]=true;
@@ -1729,11 +1755,12 @@ function takeItem(id,mine){
   } else if(it.kind==='ammo'){
     if(!bagAdd('ammo',60)){ bagFullMsg(); return; }
     toast('弾薬 +60(バッグ)');
-  } else { // scope2/scope4/noz/stk → 自動装着、無理ならバッグへ
-    const k=it.kind==='scope2'?'s2':it.kind==='scope4'?'s4':it.kind;
+  } else { // scope2/4/8/noz/stk → アクティブ武器→もう片方の順で自動装着。両方装着済みなら拾えない
+    const k=it.kind==='scope2'?'s2':it.kind==='scope4'?'s4':it.kind==='scope8'?'s8':it.kind;
     if(!autoAttachKind(k)){
-      if(!bagAdd(k,1)){ bagFullMsg(); return; }
-      toast(ITEM_LBL[it.kind]+'をバッグへ');
+      toast('装着できる武器がない(装着済み or 非対応)');
+      sfxEmpty();
+      return;
     }
   }
   updSlots(); updBag(); consumeItem(it);
@@ -2158,7 +2185,10 @@ function loop(t){
     if(keys['ArrowLeft'])me.yaw+=2.2*dt; if(keys['ArrowRight'])me.yaw-=2.2*dt;
     f=clamp(f,-1,1); s=clamp(s,-1,1);
     const wading = me.feetY < WATER_Y+0.4;
-    const SP = (wading ? 3.8 : 6.2)*(me.prone?0.35:1);
+    // スティックを倒し切るとダッシュ、少し倒すと歩き
+    const stickMag=Math.min(1, Math.hypot(f,s));
+    const dash = stickMag>0.9;
+    const SP = (wading ? 3.8 : (dash ? 7.8 : 5.0))*(me.prone?0.35:1);
     let nx=me.x+(-Math.sin(me.yaw)*f+Math.cos(me.yaw)*s)*SP*dt;
     let nz=me.z+(-Math.cos(me.yaw)*f-Math.sin(me.yaw)*s)*SP*dt;
     const rr=Math.hypot(nx,nz);
