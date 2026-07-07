@@ -2510,6 +2510,7 @@ function loop(t){
   // 相手の歩行アニメーションと足音
   let fMove=pFoeX===null?0:Math.hypot(foe.x-pFoeX, foe.z-pFoeZ);
   if(fMove>1.5) fMove=0; // リスポーン等の瞬間移動は無視
+  const fMoveA = fMove>0.005 ? Math.atan2(-(foe.x-pFoeX), -(foe.z-pFoeZ)) : null; // 移動方向
   pFoeX=foe.x; pFoeZ=foe.z;
   const ud=foeMesh.userData;
   const fsp=dt>0?fMove/dt:0;
@@ -2526,8 +2527,21 @@ function loop(t){
       const to=moving?ud.actWalk:ud.actIdle, from=moving?ud.actIdle:ud.actWalk;
       if(to&&from){ from.fadeOut(0.18); to.reset().fadeIn(0.18).play(); }
     }
-    if(ud.actWalk) ud.actWalk.timeScale=clamp(fsp/4,0.7,2.2);
+    // 横移動: 体を移動方向へひねる(頭は照準方向をキープ)/ 後ろ移動: 逆再生
+    ud.rel=ud.rel||0;
+    let back=false, tRel=0;
+    if(moving && fMoveA!==null){
+      let rel=norm(fMoveA-foe.a);
+      if(Math.abs(rel)>2.2){ back=true; rel=norm(rel+Math.PI); } // 後退
+      tRel=clamp(rel,-1.15,1.15)*0.75;
+    }
+    ud.rel+=(tRel-ud.rel)*Math.min(1,dt*8);
+    if(ud.actWalk) ud.actWalk.timeScale=(back?-1:1)*clamp(fsp/4,0.7,2.2);
     ud.mixer.update(dt);
+    if(ud.bones && foe.pr<0.5){ // 頭と背骨で打ち消して視線は正面のまま
+      if(ud.bones.head)  ud.bones.head.rotation.y  -= ud.rel*0.65;
+      if(ud.bones.spine) ud.bones.spine.rotation.y -= ud.rel*0.35;
+    }
     applyCrawl(ud, foe.pr, ud.phase, Math.max(ud.amp,0.3));
   }
   foeStepAcc+=fMove;
@@ -2540,8 +2554,8 @@ function loop(t){
   const fBase=(fg<WATER_Y && foe.fy<WATER_Y) ? WATER_Y-0.5 : foe.fy;
   foeMesh.position.set(foe.x,
     fBase+Math.abs(Math.sin(ud.phase))*(ud.mixer?0.015:0.06)*ud.amp*(1-foe.pr)+(ud.mixer?0.08:0.22)*foe.pr, foe.z);
-  foeMesh.rotation.y=foe.a+Math.PI;
-  foeMesh.rotation.z=Math.sin(ud.phase)*0.05*ud.amp*(1-foe.pr);
+  foeMesh.rotation.y=foe.a+Math.PI+(ud.rel||0)*(1-foe.pr);
+  foeMesh.rotation.z=Math.sin(ud.phase)*0.05*ud.amp*(1-foe.pr)-Math.sin(ud.rel||0)*0.08*ud.amp*(1-foe.pr);
   foeMesh.rotation.x=-1.15*foe.pr;
   foeMesh.visible = training ? false : (foe.prot>0 ? ((t/140|0)%2===0) : true);
   if(training){
