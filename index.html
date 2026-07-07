@@ -2641,10 +2641,12 @@ function loop(t){
     const targetY=Math.max(gh, gh<WATER_Y?WATER_Y-0.5:gh)+(me.prone?0.5:EYE);
     me.eyeY += (targetY-me.eyeY)*Math.min(1,dt*14);
     const wantFire = firing||keys['Space']||keys['KeyF'];
+    // 投げ物は「うつ」長押しでも、右画面タッチ(視点スティック)でも狙える
+    const nadeHold = wantFire || aim.id!==-1;
     if(me.sel>=2 && me.healT<=0){
       // 投げ物: 押している間は軌道を表示、離すとその軌道どおりに投げる
       const kind = me.sel===2?'nade':'smoke';
-      if(wantFire && bagCount(kind)>0 && me.cd<=0){
+      if(nadeHold && bagCount(kind)>0 && me.cd<=0){
         nadeAiming=true; updateTrajectory();
       } else if(nadeAiming){
         nadeAiming=false; hideTrajectory(); doThrow(); holdLock=true;
