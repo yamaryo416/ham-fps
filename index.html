@@ -281,7 +281,7 @@ function wire(){ conn.on('data',onData); conn.on('close',lostConn); conn.on('err
 function lostConn(){ if(state==='dead')return; state='dead'; show('lostScreen'); $('gameWrap').style.display='none'; }
 
 // ---------------- 定義 ----------------
-const PLAY_R=110, EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
+const PLAY_R=128, EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
 const WPN=[
   {name:'G18',   cal:'9mm', cls:'pst', dmg:20, cd:0.42, spd:70,  col:0x9aa3b2, spread:0.008, ammo:36, mag:12, rel:1.1, recoil:0.025},
   {name:'M416',  cal:'5mm', cls:'ar',  dmg:13, cd:0.14, spd:75,  col:0x5ad0a5, spread:0.018, ammo:60, mag:30, rel:1.6, recoil:0.013},
@@ -339,7 +339,7 @@ function bagConsume(k,n){
   return n-left;
 }
 const foe={x:24,z:24,tx:24,tz:24,a:0,ta:0,hp:100,prot:0,prone:false,pr:0,fy:0,tfy:0};
-let platforms=[], factorySite=null;
+let platforms=[], factorySite=null, mansionSite=null;
 let foeScore=0, projectiles=[], nadesArr=[], puffs=[], gunKick=0, hurtT=0, hitT=0, msgT=0;
 let pFoeX=null, pFoeZ=null, foeStepAcc=0, myStepAcc=0, bobPhase=0, walkAmp=0, adsT=0;
 let balloons=new Map(), balloonSeq=0, balloonTimer=0.5, myBalloons=0, foeBalloons=0, smokeClouds=[];
@@ -452,7 +452,7 @@ function buildHeightFn(rng){
   // フィールド内の山(広く高いガウス峰)
   const peaks=[];
   for(let i=0;i<7;i++){
-    const a=rng()*6.28, r=20+rng()*70;
+    const a=rng()*6.28, r=20+rng()*85;
     peaks.push({x:Math.cos(a)*r, z:Math.sin(a)*r, h:8+rng()*9, s:10+rng()*10});
   }
   const raw=(x,z)=>{
@@ -478,12 +478,27 @@ function buildHeightFn(rng){
   }
   fh=clamp(fh, WATER_Y+1.3, 12);
   factorySite={x:fx, z:fz, h:fh};
+  // マンション用地(平原=低くて平らな場所、工場から離す)
+  let mx=-40, mz=20, mh=0;
+  for(let i=0;i<16;i++){
+    const ma=rng()*6.28, mr=32+rng()*58;
+    mx=Math.cos(ma)*mr; mz=Math.sin(ma)*mr;
+    mh=raw(mx,mz);
+    if(mh>WATER_Y+1.2 && mh<6 && Math.hypot(mx-fx,mz-fz)>44) break;
+  }
+  mh=clamp(mh, WATER_Y+1.4, 8);
+  mansionSite={x:mx, z:mz, h:mh};
   return (x,z)=>{
     let h=raw(x,z);
     const df=Math.hypot(x-factorySite.x, z-factorySite.z);
     if(df<20){
       const k=df<15?1:1-(df-15)/5;
       h=h*(1-k)+fh*k;
+    }
+    const dm=Math.hypot(x-mansionSite.x, z-mansionSite.z);
+    if(dm<20){
+      const k=dm<14?1:1-(dm-14)/6;
+      h=h*(1-k)+mh*k;
     }
     return h;
   };
@@ -515,7 +530,7 @@ function safeSpot(x,z){
 
 function buildWorld(rng){
   scene=new THREE.Scene();
-  scene.fog=new THREE.Fog(0xd2e2ec, 60, 265);
+  scene.fog=new THREE.Fog(0xd2e2ec, 60, 295);
   camera=new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 700);
   camera.rotation.order='YXZ';
   scene.add(new THREE.HemisphereLight(0xdcecf9, 0x51603f, 1.12));
@@ -538,7 +553,7 @@ function buildWorld(rng){
     new THREE.MeshBasicMaterial({color:0xfff0c0, transparent:true, opacity:0.3, blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));
   sunGlow.position.copy(sunBall.position); scene.add(sunGlow);
 
-  const SEG=190, SIZE=340;
+  const SEG=200, SIZE=380;
   const geo=new THREE.PlaneGeometry(SIZE,SIZE,SEG,SEG);
   geo.rotateX(-Math.PI/2);
   const pos=geo.attributes.position;
@@ -658,6 +673,73 @@ function buildWorld(rng){
     g.position.set(cx,base,cz); g.rotation.y=yaw;
     scene.add(g);
   }
+  function nearMansion(x,z,pad){ return mansionSite && Math.hypot(x-mansionSite.x, z-mansionSite.z)<pad; }
+  // マンション(4階建て+屋上)— 平原に配置。前面中央は全階吹き抜けの開口+バルコニー
+  function buildMansion(cx,cz){
+    const base=groundY(cx,cz);
+    const W=8, D=6, FH=2.7, FLOORS=4, ROOF=FH*FLOORS, SL=1.3;
+    const g=new THREE.Group();
+    const bodyM=new THREE.MeshLambertMaterial({color:0xcfc4b2});
+    const trimM=new THREE.MeshLambertMaterial({color:0x99a0aa});
+    const slabM=new THREE.MeshLambertMaterial({color:0xb3ab97});
+    const winM=new THREE.MeshLambertMaterial({color:0x39434f});
+    const railM=new THREE.MeshLambertMaterial({color:0x5b8fc4});
+    function box(w,h,d,x,y,z,m){ const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m||bodyM); b.position.set(x,y,z); g.add(b); return b; }
+    // 外周壁(前面は中央スロットを開ける)
+    box(W-SL, ROOF, 0.26, -(SL+W)/2, ROOF/2, D);
+    box(W-SL, ROOF, 0.26,  (SL+W)/2, ROOF/2, D);
+    box(W*2, ROOF, 0.26, 0, ROOF/2, -D);
+    box(0.26, ROOF, D*2, -W, ROOF/2, 0);
+    box(0.26, ROOF, D*2,  W, ROOF/2, 0);
+    addWallLine(cx,cz,0, -W,D, -SL,D, base+ROOF);
+    addWallLine(cx,cz,0,  SL,D,  W,D, base+ROOF);
+    addWallLine(cx,cz,0, -W,-D, W,-D, base+ROOF);
+    addWallLine(cx,cz,0, -W,-D, -W,D, base+ROOF);
+    addWallLine(cx,cz,0,  W,-D,  W,D, base+ROOF);
+    // 窓(はめ殺しの見た目)と階の帯
+    for(let n=0;n<FLOORS;n++){
+      const wy=FH*n+1.5;
+      for(const wx of [-(SL+1.7),-(SL+4.2),(SL+1.7),(SL+4.2)]) box(1.3,1.15,0.08, wx, wy, D+0.15, winM);
+      for(const wx of [-6,-3.6,-1.2,1.2,3.6,6]) box(1.3,1.15,0.08, wx, wy, -D-0.15, winM);
+      for(const wz of [-3.8,-1.3,1.2,3.7]){ box(0.08,1.15,1.3, -W-0.15, wy, wz, winM); box(0.08,1.15,1.3, W+0.15, wy, wz, winM); }
+      if(n>0){ box(W*2+0.2,0.14,0.1, 0,FH*n,D+0.14, trimM); box(W*2+0.2,0.14,0.1, 0,FH*n,-D-0.14, trimM); }
+    }
+    // 各階の床(背面のスロープ用シャフト z<-D+2.4 は吹き抜け)
+    for(let n=1;n<=FLOORS;n++){
+      const fy=FH*n;
+      box(W*2-0.3,0.22,(D-0.15)-(-D+2.4), 0, fy+0.11, (D-0.15+(-D+2.4))/2, slabM);
+      platforms.push({x0:cx-W+0.15,x1:cx+W-0.15, z0:cz-D+2.4,z1:cz+D-0.15, y0:base+fy+0.22, y1:base+fy+0.22});
+    }
+    // 背面シャフト内のスロープ(1階→2階→…→屋上のつづら折り)
+    for(let n=0;n<FLOORS;n++){
+      const yLo=FH*n, yHi=FH*(n+1);
+      const x0=-W+0.6, x1=W-0.6, span=x1-x0;
+      const up = (n%2===0); // 偶数階は+x方向へ上る
+      const r=box(Math.hypot(span,FH),0.16,1.9, 0, (yLo+yHi)/2, -D+1.35, trimM);
+      r.rotation.z=(up?-1:1)*Math.atan2(FH,span);
+      platforms.push({x0:cx+x0,x1:cx+x1, z0:cz-D+0.35,z1:cz-D+2.55, axis:'x',
+        y0:base+(up?yLo:yHi)+0.22, y1:base+(up?yHi:yLo)+0.22});
+    }
+    // バルコニー(2〜4階、前面スロット外側)— 手すりは見た目のみ
+    for(let n=1;n<FLOORS;n++){
+      const fy=FH*n;
+      box(3.2,0.18,1.7, 0, fy+0.09, D+0.85, slabM);
+      platforms.push({x0:cx-1.6,x1:cx+1.6, z0:cz+D,z1:cz+D+1.7, y0:base+fy+0.18, y1:base+fy+0.18});
+      box(3.2,0.08,0.08, 0, fy+0.95, D+1.66, railM);
+      for(const sx of[-1,1]){ box(0.08,0.08,1.7, sx*1.56, fy+0.95, D+0.85, railM); box(0.08,0.9,0.08, sx*1.56, fy+0.5, D+1.62, railM); }
+      box(0.08,0.9,0.08, 0, fy+0.5, D+1.66, railM);
+    }
+    // 屋上パラペット(前面はスロット上だけ開けて飛び降り口に。外周の壁判定が縁からの転落を防ぐ)
+    box(W*2+0.5,0.9,0.26, 0, ROOF+0.55, -(D+0.12), trimM);
+    box(W-SL,0.9,0.26, -(SL+W)/2, ROOF+0.55, D+0.12, trimM);
+    box(W-SL,0.9,0.26,  (SL+W)/2, ROOF+0.55, D+0.12, trimM);
+    for(const sx of[-1,1]) box(0.26,0.9,D*2+0.5, sx*(W+0.12), ROOF+0.55, 0, trimM);
+    // 入口の庇
+    box(3.0,0.16,1.4, 0, FH-0.4, D+0.7, trimM);
+    g.position.set(cx,base,cz);
+    scene.add(g);
+  }
+  buildMansion(mansionSite.x, mansionSite.z);
   // 工場(2階+屋上つき・軸に平行に配置)
   const F_W=11, F_D=6.5, F_H1=3.2, F_H2=6.4;
   buildBuilding(factorySite.x, factorySite.z, 0, {W:F_W,D:F_D,H:F_H2,H1:F_H1,doorTop:2.7,mat:wallMatB,factory:true,walls:[
@@ -676,10 +758,11 @@ function buildWorld(rng){
   const housePos=[];
   let placedH=0;
   for(let att2=0; att2<80 && placedH<3; att2++){
-    const ang=rng()*6.28, r=18+rng()*72;
+    const ang=rng()*6.28, r=18+rng()*88;
     const x=Math.cos(ang)*r, z=Math.sin(ang)*r, h=groundY(x,z);
     if(h<=WATER_Y+1.0 || h>10) continue;
     if(Math.hypot(x-factorySite.x, z-factorySite.z)<26) continue;
+    if(nearMansion(x,z,22)) continue;
     let near=false;
     for(const hp2 of housePos) if(Math.hypot(x-hp2[0],z-hp2[1])<16){ near=true; break; }
     if(near) continue;
@@ -691,8 +774,8 @@ function buildWorld(rng){
   }
   // 岩(GLB×2種 or 手作りフォールバック)— 乱数消費は両パスで同一
   for(let i=0;i<26;i++){
-    const ang=rng()*6.28, r=7+rng()*96, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
-    if(groundY(x,z)<WATER_Y+0.3){ continue; }
+    const ang=rng()*6.28, r=7+rng()*112, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+    if(groundY(x,z)<WATER_Y+0.3 || nearMansion(x,z,12)){ continue; }
     const rad=1.0+rng()*1.8;
     const c1=rng(), c2=rng(), c3=rng();          // 色(手作り) / 種類・向き(GLB)に再利用
     const r1=rng(), r2=rng(), r3=rng();          // 回転
@@ -798,10 +881,10 @@ function buildWorld(rng){
   for(let i=0;i<56;i++){
     let x=0,z=0,ok=false;
     for(let tr=0;tr<14;tr++){
-      const ang=rng()*6.28, r=6+rng()*96;
+      const ang=rng()*6.28, r=6+rng()*112;
       x=Math.cos(ang)*r; z=Math.sin(ang)*r;
       const h=groundY(x,z);
-      if(h>WATER_Y+1.2 && h<8){ ok=true; break; }
+      if(h>WATER_Y+1.2 && h<8 && !nearMansion(x,z,12)){ ok=true; break; }
     }
     if(!ok) continue;
     const base=groundY(x,z), s=0.8+rng()*0.7;
@@ -831,7 +914,7 @@ function buildWorld(rng){
       for(let tr=0;tr<10;tr++){
         const a=rng()*6.28, r=Math.sqrt(rng())*rad;
         x=fx+Math.cos(a)*r; z=fz+Math.sin(a)*r; h=groundY(x,z);
-        if(h>WATER_Y+0.9 && h<14){ ok=true; break; }
+        if(h>WATER_Y+0.9 && h<14 && !nearMansion(x,z,12)){ ok=true; break; }
       }
       if(!ok){ d.position.set(0,-90,0); d.rotation.set(0,0,0); d.scale.setScalar(0.001); }
       else {
@@ -845,17 +928,17 @@ function buildWorld(rng){
     for(const m of meshes) scene.add(m);
   }
   for(let i=0;i<5;i++){
-    const a=rng()*6.28, r=25+rng()*72;
+    const a=rng()*6.28, r=25+rng()*88;
     addForest(Math.cos(a)*r, Math.sin(a)*r, 11+rng()*5, 32);
   }
   // 倒木と切り株
   for(let i=0;i<8;i++){
     let x=0,z=0,ok=false;
     for(let tr=0;tr<12;tr++){
-      const ang=rng()*6.28, r=6+rng()*88;
+      const ang=rng()*6.28, r=6+rng()*104;
       x=Math.cos(ang)*r; z=Math.sin(ang)*r;
       const h=groundY(x,z);
-      if(h>WATER_Y+0.8 && h<5){ ok=true; break; }
+      if(h>WATER_Y+0.8 && h<5 && !nearMansion(x,z,12)){ ok=true; break; }
     }
     if(!ok) continue;
     const h=groundY(x,z), len=1.8+rng()*1.6, rad=0.16+rng()*0.1;
@@ -886,9 +969,9 @@ function buildWorld(rng){
     obstacles.push({x,z,rr:0.55,top:h+rad*2.2});
   }
   for(let i=0;i<6;i++){
-    const ang=rng()*6.28, r=6+rng()*88, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+    const ang=rng()*6.28, r=6+rng()*104, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
     const h=groundY(x,z);
-    if(h<WATER_Y+0.8 || h>5) continue;
+    if(h<WATER_Y+0.8 || h>5 || nearMansion(x,z,12)) continue;
     if(stumpParts){
       const g=new THREE.Group();
       for(const p of stumpParts) g.add(new THREE.Mesh(p.geo, p.mat));
@@ -910,8 +993,8 @@ function buildWorld(rng){
   }
   // 茂み(GLB or 手作り)— 乱数消費は両パスで同一
   for(let i=0;i<34;i++){
-    const ang=rng()*6.28, r=5+rng()*96, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
-    if(groundY(x,z)<WATER_Y+0.5) continue;
+    const ang=rng()*6.28, r=5+rng()*112, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+    if(groundY(x,z)<WATER_Y+0.5 || nearMansion(x,z,11)) continue;
     const s=0.4+rng()*0.5;
     const c1=rng(), c2=rng(), c3=rng();
     if(bushParts){
@@ -936,7 +1019,7 @@ function buildWorld(rng){
   for(let m=0;m<3;m++){
     const inst=new THREE.InstancedMesh(grassGeo, new THREE.MeshLambertMaterial({color:gCols[m]}), 400);
     for(let i=0;i<400;i++){
-      const ang=rng()*6.28, r=3+rng()*104, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+      const ang=rng()*6.28, r=3+rng()*122, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
       const h=groundY(x,z);
       if(h<WATER_Y+0.7 || h>6.5){
         dummy.position.set(0,-60,0); dummy.rotation.set(0,0,0); dummy.scale.setScalar(0.001);
@@ -981,7 +1064,7 @@ function buildWorld(rng){
   function addItem(id,kind,w){
     let x=0,z=0;
     for(let tr=0;tr<20;tr++){
-      const ang=rng()*6.28, r=12+rng()*85;
+      const ang=rng()*6.28, r=12+rng()*100;
       x=Math.cos(ang)*r; z=Math.sin(ang)*r;
       if(groundY(x,z)>WATER_Y+0.6) break;
     }
@@ -1869,7 +1952,7 @@ function hostSpawnBalloon(){
   const id=balloonSeq++;
   let x=0,z=0,y=0;
   for(let tr=0;tr<20;tr++){
-    const ang=Math.random()*6.28, r=4+Math.random()*95;
+    const ang=Math.random()*6.28, r=4+Math.random()*112;
     x=Math.cos(ang)*r; z=Math.sin(ang)*r;
     const h=groundY(x,z);
     y=Math.max(h,WATER_Y)+1.4+Math.random()*2.6;
