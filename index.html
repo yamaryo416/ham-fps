@@ -703,18 +703,29 @@ function buildWorld(rng){
   const barkMat=new THREE.MeshLambertMaterial({color:0x7a5b3a, map:makeBarkTexture()});
   const barkMatD=new THREE.MeshLambertMaterial({color:0x66492e, map:makeBarkTexture()});
   function addConifer(x,z,base,s){
+    // 乱数はGLBの有無に関わらず同じ回数引く(P2Pの地形同期を保つ)
     const lean=(rng()-0.5)*0.1;
-    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.11*s,0.22*s,1.6*s,7), barkMat);
-    trunk.position.set(x, base+0.8*s, z); trunk.rotation.z=lean;
-    scene.add(trunk);
     const hue=0.31+rng()*0.05, sat=0.32+rng()*0.14, li=0.19+rng()*0.05;
-    for(let k=0;k<3;k++){
-      const cr=(1.55-k*0.42)*s, ch=1.55*s, cy=base+(1.55+k*0.72)*s;
-      const cone=new THREE.Mesh(jitterGeo(new THREE.ConeGeometry(cr,ch,9), cr*0.18),
-        new THREE.MeshLambertMaterial({color:new THREE.Color().setHSL(hue,sat,li+k*0.035)}));
-      cone.position.set(x+Math.sin(lean)*(cy-base)*0.6, cy, z);
-      cone.rotation.z=lean*0.6;
-      scene.add(cone);
+    if(pineParts){
+      const g=new THREE.Group();
+      for(const p of pineParts) g.add(new THREE.Mesh(p.geo, p.mat));
+      g.scale.setScalar(3.9*s);
+      g.rotation.y=hue*120; // 引いた乱数を向きに再利用
+      g.rotation.z=lean*0.5;
+      g.position.set(x, base, z);
+      scene.add(g);
+    } else {
+      const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.11*s,0.22*s,1.6*s,7), barkMat);
+      trunk.position.set(x, base+0.8*s, z); trunk.rotation.z=lean;
+      scene.add(trunk);
+      for(let k=0;k<3;k++){
+        const cr=(1.55-k*0.42)*s, ch=1.55*s, cy=base+(1.55+k*0.72)*s;
+        const cone=new THREE.Mesh(jitterGeo(new THREE.ConeGeometry(cr,ch,9), cr*0.18),
+          new THREE.MeshLambertMaterial({color:new THREE.Color().setHSL(hue,sat,li+k*0.035)}));
+        cone.position.set(x+Math.sin(lean)*(cy-base)*0.6, cy, z);
+        cone.rotation.z=lean*0.6;
+        scene.add(cone);
+      }
     }
     obstacles.push({x,z,rr:0.4*s,top:base+1.6*s});
   }
@@ -755,12 +766,22 @@ function buildWorld(rng){
   }
   // 森エリア: 針葉樹が密集(インスタンス描画で軽量)
   function addForest(fx,fz,rad,count){
-    const trunkGeo=new THREE.CylinderGeometry(0.13,0.24,1.7,6); trunkGeo.translate(0,0.85,0);
-    const coneGeoA=new THREE.ConeGeometry(1.5,2.8,7); coneGeoA.translate(0,2.7,0);
-    const coneGeoB=new THREE.ConeGeometry(1.05,2.1,7); coneGeoB.translate(0,4.1,0);
-    const tI=new THREE.InstancedMesh(trunkGeo, barkMat, count);
-    const cA=new THREE.InstancedMesh(coneGeoA, new THREE.MeshLambertMaterial({color:0x2e6b28}), count);
-    const cB=new THREE.InstancedMesh(coneGeoB, new THREE.MeshLambertMaterial({color:0x3a7d33}), count);
+    // GLBがあればそのジオメトリを、なければ手作りの幹+コーンをインスタンス描画
+    let meshes, scaleMul;
+    if(pineParts){
+      meshes=pineParts.map(p=>new THREE.InstancedMesh(p.geo, p.mat, count));
+      scaleMul=4.6;
+    } else {
+      const trunkGeo=new THREE.CylinderGeometry(0.13,0.24,1.7,6); trunkGeo.translate(0,0.85,0);
+      const coneGeoA=new THREE.ConeGeometry(1.5,2.8,7); coneGeoA.translate(0,2.7,0);
+      const coneGeoB=new THREE.ConeGeometry(1.05,2.1,7); coneGeoB.translate(0,4.1,0);
+      meshes=[
+        new THREE.InstancedMesh(trunkGeo, barkMat, count),
+        new THREE.InstancedMesh(coneGeoA, new THREE.MeshLambertMaterial({color:0x2e6b28}), count),
+        new THREE.InstancedMesh(coneGeoB, new THREE.MeshLambertMaterial({color:0x3a7d33}), count)
+      ];
+      scaleMul=1;
+    }
     const d=new THREE.Object3D();
     for(let i=0;i<count;i++){
       let x=0,z=0,h=0,ok=false;
@@ -772,13 +793,13 @@ function buildWorld(rng){
       if(!ok){ d.position.set(0,-90,0); d.rotation.set(0,0,0); d.scale.setScalar(0.001); }
       else {
         const s=0.7+rng()*0.8;
-        d.position.set(x,h,z); d.rotation.set(0,rng()*6.28,0); d.scale.setScalar(s);
+        d.position.set(x,h,z); d.rotation.set(0,rng()*6.28,0); d.scale.setScalar(s*scaleMul);
         obstacles.push({x,z,rr:0.35*s,top:h+1.6*s});
       }
       d.updateMatrix();
-      tI.setMatrixAt(i,d.matrix); cA.setMatrixAt(i,d.matrix); cB.setMatrixAt(i,d.matrix);
+      for(const m of meshes) m.setMatrixAt(i,d.matrix);
     }
-    scene.add(tI,cA,cB);
+    for(const m of meshes) scene.add(m);
   }
   for(let i=0;i<5;i++){
     const a=rng()*6.28, r=25+rng()*72;
@@ -989,6 +1010,39 @@ function buildWorld(rng){
     new THREE.MeshBasicMaterial({color:0xffd98a, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false}));
   buildViewModel();
 }
+
+// ---------------- 3Dモデル(GLB)読み込み ----------------
+// 静的モデルを正規化(足元y=0・高さ1)したジオメトリ+マテリアルの配列にする
+function loadModelParts(url, done){
+  if(!window.THREE || !THREE.GLTFLoader) return;
+  try{
+    new THREE.GLTFLoader().load(url, g=>{
+      const parts=[];
+      g.scene.updateMatrixWorld(true);
+      g.scene.traverse(o=>{
+        if(o.isMesh){
+          const geo=o.geometry.clone();
+          geo.applyMatrix4(o.matrixWorld);
+          const map=(o.material&&o.material.map)||null;
+          if(map) map.encoding=THREE.LinearEncoding;
+          parts.push({geo, mat:new THREE.MeshLambertMaterial({map})});
+        }
+      });
+      if(!parts.length) return;
+      const bb=new THREE.Box3();
+      for(const p of parts){ p.geo.computeBoundingBox(); bb.union(p.geo.boundingBox); }
+      const h=(bb.max.y-bb.min.y)||1;
+      const cx=(bb.min.x+bb.max.x)/2, cz=(bb.min.z+bb.max.z)/2;
+      for(const p of parts){
+        p.geo.translate(-cx,-bb.min.y,-cz);
+        p.geo.scale(1/h,1/h,1/h);
+      }
+      done(parts);
+    }, undefined, e=>console.warn(url+' 読み込み失敗(手作りで続行)', e));
+  }catch(e){ console.warn(e); }
+}
+let pineParts=null;
+loadModelParts('assets/pine.glb', p=>{ pineParts=p; });
 
 // ---------------- 3Dハムスターモデル(GLB) ----------------
 let hamGLB=null, hamClips=[];
