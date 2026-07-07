@@ -144,7 +144,7 @@
   .tOpt { width:118px; height:36px; border-radius:9px; border:1.5px solid rgba(255,255,255,0.35);
     background:rgba(8,10,16,0.85); color:#fff; font-family:inherit; font-weight:700; font-size:11px; touch-action:none; }
   .tOpt:disabled { color:#5a6070; border-color:rgba(255,255,255,0.12); }
-  #overlay { position:absolute; inset:0; background:rgba(8,10,16,0.78); display:none; flex-direction:column;
+  #overlay { position:absolute; inset:0; background:rgba(8,10,16,0.45); display:none; flex-direction:column;
     align-items:center; justify-content:center; gap:20px; z-index:40; }
   #overTitle { font-size:32px; font-weight:700; }
   @media (prefers-reduced-motion: reduce) { .pulse { animation:none; } }
@@ -335,6 +335,7 @@ let foeScore=0, projectiles=[], nadesArr=[], puffs=[], gunKick=0, hurtT=0, hitT=
 let pFoeX=null, pFoeZ=null, foeStepAcc=0, myStepAcc=0, bobPhase=0, walkAmp=0, adsT=0;
 let balloons=new Map(), balloonSeq=0, balloonTimer=0.5, myBalloons=0, foeBalloons=0, smokeClouds=[];
 let training=false, dummies=[], dmgNums=[];
+let deathFxs=[], victoryFx=null;
 
 // ---------------- 質感テクスチャ ----------------
 let _groundTex=null, _furTex=null, _barkTex=null;
@@ -1176,6 +1177,47 @@ function makeHamModel(hostSide){
   }
   return g;
 }
+// やられモーション: その場にコテンと倒れて消える
+function spawnDeathFx(x,y,z,a,hostSide){
+  if(!scene) return;
+  const m=hamModel(hostSide);
+  m.position.set(x,y,z);
+  m.rotation.y=a+Math.PI;
+  scene.add(m);
+  deathFxs.push({m,t:0});
+}
+function updateDeathFxs(dt){
+  for(let i=deathFxs.length-1;i>=0;i--){
+    const d=deathFxs[i]; d.t+=dt;
+    if(d.m.userData.mixer) d.m.userData.mixer.update(dt);
+    const k=Math.min(1,d.t/0.45);
+    d.m.rotation.z=k*k*1.5;                    // コテンと倒れる
+    if(d.t>0.9) d.m.position.y-=dt*0.9;        // 少し置いて沈む
+    if(d.t>1.8){ scene.remove(d.m); deathFxs.splice(i,1); }
+  }
+}
+// 勝利モーション: 勝者チームのハムスターが目の前でぴょんぴょん跳ねる
+function spawnVictoryFx(winnerIsHost){
+  if(!scene) return;
+  const m=hamModel(winnerIsHost);
+  const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+  dir.y=0; dir.normalize();
+  const px=me.x+dir.x*3.2, pz=me.z+dir.z*3.2;
+  const py=floorAt(px,pz,me.feetY+1);
+  m.position.set(px,py,pz);
+  m.lookAt(me.x,py,me.z);
+  scene.add(m);
+  victoryFx={m,t:0,baseY:py};
+}
+function updateVictoryFx(dt){
+  if(!victoryFx) return;
+  const v=victoryFx; v.t+=dt;
+  if(v.m.userData.mixer) v.m.userData.mixer.update(dt);
+  const hop=Math.abs(Math.sin(v.t*5));
+  v.m.position.y=v.baseY+hop*0.55;
+  v.m.rotation.z=Math.sin(v.t*10)*0.12;       // うれしさの小刻みな揺れ
+}
+
 // 匍匐ポーズ+這いずり: ミキサー更新の後に骨へ上書きする
 function applyCrawl(ud, pr, phase, amp){
   if(!ud.bones || pr<=0.01) return;
@@ -1636,6 +1678,7 @@ function onData(d){
     case 'bpop': popBalloon(d.id,false); break;
     case 'hit': hitT=0.25; foe.hp=d.hp; updBars(); sfxHitm(); if(navigator.vibrate)navigator.vibrate(30); break;
     case 'died':
+      spawnDeathFx(foe.x, foe.fy, foe.z, foe.a, isHost ? false : true);
       me.score++; foe.hp=100; foe.prot=2;
       foe.x=foe.tx=d.x; foe.z=foe.tz=d.z;
       foe.fy=foe.tfy=groundY(d.x,d.z);
@@ -1695,6 +1738,9 @@ function doReset(){
   balloons.clear(); balloonSeq=0; balloonTimer=0.8;
   for(const s of smokeClouds) scene.remove(s.g);
   smokeClouds=[];
+  for(const d of deathFxs) scene.remove(d.m);
+  deathFxs=[];
+  if(victoryFx){ scene.remove(victoryFx.m); victoryFx=null; }
   me.bag=[];
   me.watt={0:{scope:null,noz:false,stk:false},1:{scope:null,noz:false,stk:false}};
   $('bagPanel').style.display='none';
@@ -1731,6 +1777,7 @@ function gameOver(won){
   state='over';
   $('bagPanel').style.display='none';
   setZoom(false);
+  spawnVictoryFx(won ? isHost : !isHost);
   $('overTitle').textContent = won ? 'あなたの勝ち!' : '相手の勝ち…';
   $('overTitle').style.color = won ? '#ffd166' : '#9aa0b0';
   $('overlay').style.display='flex';
@@ -1821,9 +1868,9 @@ function hitDummy(dm,dmg,pos){
   showDamage(pos.clone().add(new THREE.Vector3(0,0.4,0)), dmg);
   if(dm.hp<=0){
     dm.down=2.5;
+    dm.dying=0.55; // コテンと倒れてから消える
     puff(new THREE.Vector3(dm.x, groundY(dm.x,dm.z)+0.8, dm.z), 0xffd166, 0.8);
     sfxPop(0.7);
-    dm.mesh.visible=false;
   }
 }
 
@@ -2542,6 +2589,15 @@ function loop(t){
       if(ud.bones.head)  ud.bones.head.rotation.y  -= ud.rel*0.65;
       if(ud.bones.spine) ud.bones.spine.rotation.y -= ud.rel*0.35;
     }
+    // 二次モーション: 歩行時は頭がリズムに合わせて揺れ、待機時はゆっくり見回す
+    ud.idleT=(ud.idleT||0)+dt;
+    if(ud.bones && ud.bones.head && foe.pr<0.5){
+      ud.bones.head.rotation.z += Math.sin(ud.phase*2.2)*0.09*ud.amp;
+      ud.bones.head.rotation.y += Math.sin(ud.idleT*0.7)*0.14*(1-ud.amp);
+    }
+    if(ud.bones && ud.bones.spine){
+      ud.bones.spine.rotation.z += Math.sin(ud.phase*2.2)*0.03*ud.amp*(1-foe.pr);
+    }
     applyCrawl(ud, foe.pr, ud.phase, Math.max(ud.amp,0.3));
   }
   foeStepAcc+=fMove;
@@ -2560,13 +2616,21 @@ function loop(t){
   foeMesh.visible = training ? false : (foe.prot>0 ? ((t/140|0)%2===0) : true);
   if(training){
     for(const dm of dummies){
+      if(dm.dying!==undefined && dm.dying>0){
+        dm.dying-=dt;
+        const k=1-Math.max(0,dm.dying)/0.55;
+        dm.mesh.rotation.z=k*k*1.5;
+        if(dm.dying<=0){ dm.mesh.visible=false; dm.mesh.rotation.z=0; }
+      }
       if(dm.hp<=0){
         dm.down-=dt;
-        if(dm.down<=0){ dm.hp=100; dm.mesh.visible=true; puff(new THREE.Vector3(dm.x,groundY(dm.x,dm.z)+0.8,dm.z),0xffffff,0.5); }
+        if(dm.down<=0){ dm.hp=100; dm.dying=undefined; dm.mesh.rotation.z=0; dm.mesh.visible=true; puff(new THREE.Vector3(dm.x,groundY(dm.x,dm.z)+0.8,dm.z),0xffffff,0.5); }
       }
       if(dm.mesh.userData.mixer) dm.mesh.userData.mixer.update(dt);
     }
   }
+  updateDeathFxs(dt);
+  updateVictoryFx(dt);
   updateDmgNums(dt);
   if(waterMesh) waterMesh.position.y=WATER_Y+Math.sin(t*0.0012)*0.03;
   for(const b of balloons.values()){
