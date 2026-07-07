@@ -77,6 +77,10 @@
     color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:13px; z-index:21; touch-action:none; }
   #adsBtn.on { background:rgba(45,123,196,0.68); }
   #adsBtn:disabled { opacity:0.3; }
+  #fireBtn2 { position:absolute; left:calc(80px + env(safe-area-inset-left)); top:calc(10px + env(safe-area-inset-top));
+    width:62px; height:62px; border-radius:50%; background:rgba(226,75,74,0.32); border:2px solid rgba(240,149,149,0.75);
+    color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:13px; z-index:21; touch-action:none; }
+  #fireBtn2.on { background:rgba(226,75,74,0.62); }
   #bagBtn { position:absolute; left:calc(50% - 90px - 50px); bottom:calc(6px + env(safe-area-inset-bottom));
     width:44px; height:44px; border-radius:50%; background:rgba(255,209,102,0.2); border:2px solid rgba(255,209,102,0.55);
     color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:10px; z-index:21; touch-action:none; }
@@ -201,6 +205,7 @@
   <div id="moveHint">画面の左側をタッチ→いどう</div>
   <div id="aimHint">画面の右側をタッチ→しせん</div>
   <button id="adsBtn">のぞく</button>
+  <button id="fireBtn2">うつ</button>
   <button id="bagBtn">バッグ</button>
   <button id="proneBtn">匍匐</button>
   <button id="exitBtn">訓練を終わる</button>
@@ -1147,7 +1152,7 @@ function makeHamModel(hostSide){
   const inst=THREE.SkeletonUtils.clone(hamGLB);
   const g=new THREE.Group();
   g.rotation.order='YXZ'; // ヨー→ピッチの順で回す(匍匐の前傾が向きに追従する)
-  inst.rotation.y=Math.PI/2; // このGLBは正面が+X向きなので+Z向きへ補正
+  inst.rotation.y=-Math.PI/2; // このGLBは正面が横向きなので進行方向(視線の逆側から見て正面)へ補正
   inst.scale.setScalar(1.25); // 元の高さ0.95 → 約1.19
   // チーム識別: きんくま=そのまま / しろくま=ピンクがかった色味
   if(!hostSide){
@@ -2523,10 +2528,12 @@ layer.addEventListener('touchend', touchEnd, {passive:false});
 layer.addEventListener('touchcancel', touchEnd, {passive:false});
 
 let firing=false;
-const fb=$('fireBtn');
-fb.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); firing=true; fb.classList.add('on'); },{passive:false});
-fb.addEventListener('touchend',   e=>{ e.preventDefault(); firing=false; fb.classList.remove('on'); },{passive:false});
-fb.addEventListener('touchcancel',e=>{ firing=false; fb.classList.remove('on'); },{passive:false});
+for(const id of ['fireBtn','fireBtn2']){
+  const fb=$(id);
+  fb.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); firing=true; fb.classList.add('on'); },{passive:false});
+  fb.addEventListener('touchend',   e=>{ e.preventDefault(); firing=false; fb.classList.remove('on'); },{passive:false});
+  fb.addEventListener('touchcancel',e=>{ firing=false; fb.classList.remove('on'); },{passive:false});
+}
 const keys={};
 addEventListener('keydown', e=>{ keys[e.code]=true;
   if(e.code==='Digit1')selectSlot(0); if(e.code==='Digit2')selectSlot(1);
