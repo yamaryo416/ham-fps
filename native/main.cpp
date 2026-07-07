@@ -82,11 +82,12 @@ struct Weapon {
   const char* name; float dmg, cd, spd, spread, recoil, rel;
   int magSize, reserveMax;
   int mag, reserve;
+  float cr, cg, cb; // ビューモデルの色
 };
 static Weapon WPN[3] = {
-  {"G18",   20, 0.42f,  70, 0.008f, 0.025f, 1.1f, 12, 36, 12, 36},
-  {"M416",  13, 0.14f,  75, 0.018f, 0.013f, 1.6f, 30, 60, 30, 60},
-  {"Kar98", 42, 0.90f, 120, 0.003f, 0.060f, 2.0f,  5, 15,  5, 15},
+  {"G18",   20, 0.42f,  70, 0.008f, 0.025f, 1.1f, 12, 36, 12, 36, 0.60f,0.64f,0.70f},
+  {"M416",  13, 0.14f,  75, 0.018f, 0.013f, 1.6f, 30, 60, 30, 60, 0.35f,0.82f,0.65f},
+  {"Kar98", 42, 0.90f, 120, 0.003f, 0.060f, 2.0f,  5, 15,  5, 15, 0.94f,0.65f,0.29f},
 };
 
 // ---------------- ゲーム状態 ----------------
@@ -273,6 +274,17 @@ static void drawCylinder(float r0,float r1,float h,int seg=8){
     glVertex3f(ca*r1,0,sa*r1);
     glVertex3f(ca*r0,h,sa*r0);
   }
+  glEnd();
+}
+static void drawBox(float w,float h,float d){
+  float x=w/2,y=h/2,z=d/2;
+  glBegin(GL_QUADS);
+  glNormal3f(0,0,1);  glVertex3f(-x,-y,z);  glVertex3f(x,-y,z);  glVertex3f(x,y,z);  glVertex3f(-x,y,z);
+  glNormal3f(0,0,-1); glVertex3f(-x,-y,-z); glVertex3f(-x,y,-z); glVertex3f(x,y,-z); glVertex3f(x,-y,-z);
+  glNormal3f(1,0,0);  glVertex3f(x,-y,-z);  glVertex3f(x,y,-z);  glVertex3f(x,y,z);  glVertex3f(x,-y,z);
+  glNormal3f(-1,0,0); glVertex3f(-x,-y,-z); glVertex3f(-x,-y,z); glVertex3f(-x,y,z); glVertex3f(-x,y,-z);
+  glNormal3f(0,1,0);  glVertex3f(-x,y,-z);  glVertex3f(-x,y,z);  glVertex3f(x,y,z);  glVertex3f(x,y,-z);
+  glNormal3f(0,-1,0); glVertex3f(-x,-y,-z); glVertex3f(x,-y,-z); glVertex3f(x,-y,z); glVertex3f(-x,-y,z);
   glEnd();
 }
 static void drawCone(float r,float h,int seg=9){
@@ -747,34 +759,96 @@ int main(){
     glDisable(GL_BLEND);
     glEnable(GL_LIGHTING);
 
+    // ---- 手元の銃(ビューモデル) ----
+    {
+      glClear(GL_DEPTH_BUFFER_BIT); // ワールドに埋まらないよう深度をリセット
+      glMatrixMode(GL_PROJECTION);
+      glLoadIdentity();
+      float aspect=(float)fbw/fbh;
+      float nearP=0.05f, farP=10.0f;
+      float t=nearP*tanf(55.0f*PI/360.0f); // FOVは固定(ADSズームで巨大化しない)
+      glFrustum(-t*aspect,t*aspect,-t,t,nearP,farP);
+      glMatrixMode(GL_MODELVIEW);
+      glLoadIdentity();
+      glLightfv(GL_LIGHT0,GL_POSITION,lightDir);
+
+      Weapon& w=WPN[me.sel];
+      float rldP = (me.reloading>=0) ? sinf(clampf(1.0f-me.cd/w.rel,0.0f,1.0f)*PI) : 0.0f;
+      float swayMul = 1.0f-me.adsT*0.85f;
+      float sway = sinf(me.bobPhase)*0.012f*me.walkAmp*swayMul;
+      float bob2 = fabsf(sinf(me.bobPhase))*0.02f*me.walkAmp*swayMul;
+      float gx = 0.30f*(1.0f-me.adsT)+sway;
+      float gy = -0.26f*(1.0f-me.adsT)-0.165f*me.adsT-me.gunKick*0.02f+bob2-0.12f*rldP;
+      float gz = -0.65f*(1.0f-me.adsT)-0.50f*me.adsT+me.gunKick*0.09f+0.06f*rldP;
+      glTranslatef(gx,gy,gz);
+      glRotatef((1.0f-me.adsT)*6,0,1,0); // 腰だめ時は銃口をやや中央へ向ける
+      glRotatef(rldP*40,1,0,0);          // リロードで手前に引く仕草
+      glRotatef(-me.gunKick*6,1,0,0);    // 発射の跳ね上がり
+      glScalef(0.75f,0.75f,0.75f);
+
+      // 本体
+      glColor3f(w.cr,w.cg,w.cb);
+      glPushMatrix(); glTranslatef(0,0,-0.10f); drawBox(0.09f,0.10f,0.50f); glPopMatrix();
+      // 銃身
+      glColor3f(0.17f,0.19f,0.24f);
+      glPushMatrix(); glTranslatef(0,0.02f,-0.45f); drawBox(0.045f,0.045f,0.28f); glPopMatrix();
+      // グリップ
+      glPushMatrix(); glTranslatef(0,-0.12f,0.13f); glRotatef(15,1,0,0); drawBox(0.07f,0.16f,0.09f); glPopMatrix();
+      // ハムスターの前足
+      glColor3f(0.94f,0.78f,0.52f);
+      glPushMatrix(); glTranslatef(0,-0.15f,0.13f); drawSphere(0.05f,8,6); glPopMatrix();
+      glPushMatrix(); glTranslatef(0.015f,-0.03f,-0.02f); drawSphere(0.05f,8,6); glPopMatrix();
+    }
+
     // ---- HUD(2D) ----
+    // 注意: glOrthoでY軸を反転しているため、四角形が裏面扱いになりカリングで消える → 一時的に無効化
+    glDisable(GL_CULL_FACE);
     glDisable(GL_LIGHTING); glDisable(GL_DEPTH_TEST); glDisable(GL_FOG);
     glMatrixMode(GL_PROJECTION); glLoadIdentity();
     glOrtho(0,fbw,fbh,0,-1,1);
     glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+    // Retina対策: フレームバッファはウィンドウの2倍などになるため、UIは倍率で拡大する
+    int winW,winH; glfwGetWindowSize(gWin,&winW,&winH);
+    float ui=(winW>0)?(float)fbw/winW:1.0f;
     // クロスヘア
+    glLineWidth(2.0f*ui);
     glColor3f(1,1,1);
     glBegin(GL_LINES);
-    glVertex2f(fbw/2.0f-12,fbh/2.0f); glVertex2f(fbw/2.0f+12,fbh/2.0f);
-    glVertex2f(fbw/2.0f,fbh/2.0f-12); glVertex2f(fbw/2.0f,fbh/2.0f+12);
+    glVertex2f(fbw/2.0f-14*ui,fbh/2.0f); glVertex2f(fbw/2.0f+14*ui,fbh/2.0f);
+    glVertex2f(fbw/2.0f,fbh/2.0f-14*ui); glVertex2f(fbw/2.0f,fbh/2.0f+14*ui);
     glEnd();
     // マガジン残量バー
     {
       Weapon& w=WPN[me.sel];
-      float ratio=(float)w.mag/w.magSize;
-      glColor4f(0,0,0,0.4f);
+      float bw=240*ui, bh=18*ui;
+      float x0=fbw/2.0f-bw/2, x1=fbw/2.0f+bw/2;
+      float y1=fbh-24*ui, y0=y1-bh;
       glEnable(GL_BLEND);
+      glColor4f(0,0,0,0.4f);
       glBegin(GL_QUADS);
-      glVertex2f(fbw/2.0f-80,fbh-46); glVertex2f(fbw/2.0f+80,fbh-46);
-      glVertex2f(fbw/2.0f+80,fbh-30); glVertex2f(fbw/2.0f-80,fbh-30);
+      glVertex2f(x0,y0); glVertex2f(x1,y0);
+      glVertex2f(x1,y1); glVertex2f(x0,y1);
       glEnd();
+      float pad=2*ui;
+      float ratio=(float)w.mag/w.magSize;
       glColor3f(1,0.85f,0.54f);
       glBegin(GL_QUADS);
-      glVertex2f(fbw/2.0f-78,fbh-44); glVertex2f(fbw/2.0f-78+156*ratio,fbh-44);
-      glVertex2f(fbw/2.0f-78+156*ratio,fbh-32); glVertex2f(fbw/2.0f-78,fbh-32);
+      glVertex2f(x0+pad,y0+pad); glVertex2f(x0+pad+(bw-2*pad)*ratio,y0+pad);
+      glVertex2f(x0+pad+(bw-2*pad)*ratio,y1-pad); glVertex2f(x0+pad,y1-pad);
+      glEnd();
+      // 弾1発ごとの区切り線
+      glLineWidth(1.0f*ui);
+      glColor4f(0,0,0,0.35f);
+      glBegin(GL_LINES);
+      for(int i=1;i<w.magSize;i++){
+        float sx=x0+pad+(bw-2*pad)*(float)i/w.magSize;
+        glVertex2f(sx,y0+pad); glVertex2f(sx,y1-pad);
+      }
       glEnd();
       glDisable(GL_BLEND);
     }
+    glLineWidth(1.0f);
+    glEnable(GL_CULL_FACE);
     glEnable(GL_FOG); glEnable(GL_DEPTH_TEST); glEnable(GL_LIGHTING);
 
     // タイトルバーにステータス表示
