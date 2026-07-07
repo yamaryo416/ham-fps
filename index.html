@@ -304,7 +304,7 @@ const SPAWNS=[[-65,-65],[65,-65],[-65,65],[65,65]];
 let heightFn=null, obstacles=[], items=[];
 let scene,camera,renderer,foeMesh,gunGroup,muzzle,waterMesh;
 const me={x:-24,z:-24,yaw:0,pitch:0,hp:100,score:0,cd:0,prot:0,slots:[0,null],sel:0,
-  ammo:{}, mag:{}, rld:null,feetY:0,eyeY:0,zoom:false,prone:false,healT:0,
+  ammo:{}, mag:{}, rld:null,feetY:0,eyeY:0,zoom:false,prone:false,healT:0,stow:false,
   bag:[],
   watt:{0:{scope:null,noz:false,stk:false},1:{scope:null,noz:false,stk:false}}};
 // バッグ(8スロット・スタック制)
@@ -1351,6 +1351,15 @@ function buildViewModel(){
   const pawMat=new THREE.MeshLambertMaterial({color: isHost?0xd9a45e:0xf2e6d4});
   const p1=new THREE.Mesh(new THREE.SphereGeometry(0.055,8,6), pawMat);
   const p2=p1.clone();
+  if(me.stow && me.sel<2){
+    // 収納状態: 素手(前足だけが見える)
+    p1.scale.setScalar(1.3); p2.scale.setScalar(1.3);
+    p1.position.set(-0.22,0.0,0.05); p2.position.set(0.2,-0.02,0.02);
+    gunGroup.add(p1,p2);
+    gunGroup.position.set(0.05,-0.3,-0.5);
+    updSlots();
+    return;
+  }
   if(me.sel===2 || me.sel===3){
     const smoke=me.sel===3;
     const b=new THREE.Mesh(new THREE.SphereGeometry(0.07,8,7),
@@ -1400,7 +1409,7 @@ function buildViewModel(){
 // ---------------- スコープ / ADS ----------------
 // スコープなしでも素の覗き込み(1.35倍)ができる
 function zoomX(){
-  if(me.sel>1) return 1;
+  if(me.sel>1 || me.stow) return 1;
   const wid=me.slots[me.sel];
   if(wid===null) return 1;
   const sc=me.watt[me.sel].scope;
@@ -1432,10 +1441,13 @@ function updSlots(){
   s0.classList.toggle('empty', me.slots[0]===null || me.ammo[me.slots[0]]===0);
   s1.classList.toggle('empty', me.slots[1]===null || (me.slots[1]!==null&&me.ammo[me.slots[1]]===0));
   tb.classList.toggle('empty', nN===0 && nS===0);
-  s0.classList.toggle('sel', me.sel===0);
-  s1.classList.toggle('sel', me.sel===1);
+  s0.classList.toggle('sel', me.sel===0 && !me.stow);
+  s1.classList.toggle('sel', me.sel===1 && !me.stow);
   tb.classList.toggle('sel', me.sel>=2);
-  if(me.sel>=2){
+  if(me.stow && me.sel<2){
+    $('ammoCnt').textContent='収納中';
+    $('ammoCnt').style.color='#9aa0b0';
+  } else if(me.sel>=2){
     const cnt = me.sel===2 ? bagCount('nade') : bagCount('smoke');
     $('ammoCnt').textContent='×'+cnt;
     $('ammoCnt').style.color = cnt===0 ? '#f09595' : '#ffd98a';
@@ -1458,9 +1470,18 @@ function selectSlot(i){
   else if(i===3){ if(bagCount('smoke')<=0&&me.sel!==3) return; }
   else if(me.slots[i]===null) return;
   $('throwMenu').style.display='none';
-  if(me.sel===i) return;
+  if(me.sel===i){
+    if(i>=2) return;
+    // 同じ武器を再タップ→収納/取り出しの切り替え(素手だと少し速く動ける)
+    me.stow=!me.stow;
+    if(me.rld!==null){ me.rld=null; me.cd=Math.min(me.cd,0.25); }
+    setZoom(false); buildViewModel();
+    toast(me.stow?'武器を収納した(移動が少し速くなる)':'武器を取り出した');
+    if(navigator.vibrate) navigator.vibrate(10);
+    return;
+  }
   if(me.rld!==null){ me.rld=null; me.cd=Math.min(me.cd,0.25); }
-  me.sel=i; setZoom(false); buildViewModel();
+  me.sel=i; me.stow=false; setZoom(false); buildViewModel();
   if(navigator.vibrate) navigator.vibrate(10);
 }
 for(const i of [0,1]){
@@ -1756,7 +1777,7 @@ function startGame(){
 function onResize(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); }
 function resetLoadout(){
   returnAtts(0); returnAtts(1); // 装着中のアタッチメントはバッグへ戻る
-  me.slots=[0,null]; me.sel=0;
+  me.slots=[0,null]; me.sel=0; me.stow=false;
   me.ammo={}; me.mag={};
   for(let i=0;i<WPN.length;i++){ me.ammo[i]=0; me.mag[i]=0; }
   me.ammo[0]=WPN[0].ammo; me.mag[0]=WPN[0].mag;
@@ -2155,7 +2176,7 @@ function explode(pos,mine){
 }
 let emptyToastT=0;
 function startReload(wi){
-  if(me.rld!==null || me.healT>0) return;
+  if(me.rld!==null || me.healT>0 || me.stow) return;
   if(me.mag[wi]>=WPN[wi].mag || me.ammo[wi]<=0) return;
   me.rld=wi;
   me.cd=Math.max(me.cd, WPN[wi].rel);
@@ -2228,6 +2249,11 @@ function doThrow(){
 }
 function fire(){
   if(me.healT>0) return; // 回復中は撃てない
+  if(me.stow && me.sel<2){
+    const now=performance.now();
+    if(now-emptyToastT>1500){ emptyToastT=now; toast('武器を収納中!スロットをタップして取り出そう'); }
+    return;
+  }
   if(me.sel>=2){ doThrow(); return; }
   const wi=me.slots[me.sel];
   if(wi===null || me.cd>0) return;
@@ -2588,7 +2614,8 @@ function loop(t){
       adsMul = c==='snp'?0.3 : c==='ar'?0.55 : c==='smg'?0.8 : 0.7;
     }
     const healMul = me.healT>0 ? 0.4 : 1;
-    const SP = (wading ? 1.8 : (dash ? 4.2 : 2.4))*(me.prone?0.35:1)*adsMul*healMul;
+    const stowMul = (me.stow && me.sel<2) ? 1.25 : 1; // 素手なら少し速い
+    const SP = (wading ? 1.8 : (dash ? 4.2 : 2.4))*(me.prone?0.35:1)*adsMul*healMul*stowMul;
     let nx=me.x+(-Math.sin(me.yaw)*f+Math.cos(me.yaw)*s)*SP*dt;
     let nz=me.z+(-Math.cos(me.yaw)*f-Math.sin(me.yaw)*s)*SP*dt;
     const rr=Math.hypot(nx,nz);
@@ -2657,7 +2684,8 @@ function loop(t){
   }
   // 覗き込み: 銃を画面中央下へ構える(腰だめ⇄ADSを補間)
   adsT+=(((me.zoom&&me.sel<2)?1:0)-adsT)*Math.min(1,dt*10);
-  const hipX=me.sel>1?0.3:0.32, hipY=me.sel>1?-0.28:-0.3, hipZ=me.sel>1?-0.55:-0.65;
+  const stowed=me.stow&&me.sel<2;
+  const hipX=stowed?0.05:me.sel>1?0.3:0.32, hipY=stowed?-0.32:me.sel>1?-0.28:-0.3, hipZ=stowed?-0.5:me.sel>1?-0.55:-0.65;
   const swayK=1-adsT*0.85;
   // リロードの仕草: 銃を下に傾けて戻す
   const rldP = (me.rld!==null && me.sel<2) ? Math.sin(clamp(1-me.cd/WPN[me.rld].rel,0,1)*Math.PI) : 0;
