@@ -288,6 +288,66 @@ static void drawCone(float r,float h,int seg=9){
   glEnd();
 }
 
+// ---------------- .hamモデル(GLB変換済み)読み込み ----------------
+#ifndef GL_GENERATE_MIPMAP
+#define GL_GENERATE_MIPMAP 0x8191
+#endif
+struct Model { GLuint list=0, tex=0; bool ok=false; };
+static Model loadHam(const char* name){
+  Model m;
+  const char* prefixes[]={"assets_native/","../assets_native/","native/assets_native/"};
+  FILE* f=nullptr; char path[512];
+  for(const char* p : prefixes){
+    snprintf(path,sizeof(path),"%s%s",p,name);
+    f=fopen(path,"rb");
+    if(f) break;
+  }
+  if(!f){ fprintf(stderr,"model missing: %s (手作りモデルで続行)\n", name); return m; }
+  char magic[4]; uint32_t vc=0,ic=0,tw=0,th=0;
+  if(fread(magic,1,4,f)!=4 || memcmp(magic,"HAM1",4)!=0){ fclose(f); return m; }
+  fread(&vc,4,1,f); fread(&ic,4,1,f); fread(&tw,4,1,f); fread(&th,4,1,f);
+  std::vector<float> vtx((size_t)vc*8);
+  std::vector<uint32_t> idx(ic);
+  fread(vtx.data(),4,(size_t)vc*8,f);
+  fread(idx.data(),4,ic,f);
+  std::vector<uint8_t> tex;
+  if(tw&&th){ tex.resize((size_t)tw*th*3); fread(tex.data(),1,tex.size(),f); }
+  fclose(f);
+  if(tw&&th){
+    glGenTextures(1,&m.tex);
+    glBindTexture(GL_TEXTURE_2D,m.tex);
+    glTexParameteri(GL_TEXTURE_2D,GL_GENERATE_MIPMAP,GL_TRUE);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,tw,th,0,GL_RGB,GL_UNSIGNED_BYTE,tex.data());
+  }
+  m.list=glGenLists(1);
+  glNewList(m.list, GL_COMPILE);
+  glBegin(GL_TRIANGLES);
+  for(uint32_t i : idx){
+    const float* v=&vtx[(size_t)i*8];
+    glNormal3fv(v+3);
+    glTexCoord2fv(v+6);
+    glVertex3fv(v);
+  }
+  glEnd();
+  glEndList();
+  m.ok=true;
+  return m;
+}
+static void drawModel(const Model& m){
+  glColor3f(1,1,1);
+  glEnable(GL_TEXTURE_2D);
+  glBindTexture(GL_TEXTURE_2D,m.tex);
+  glCallList(m.list);
+  glDisable(GL_TEXTURE_2D);
+}
+static Model gMHam,gMPine,gMLeafy,gMRockA,gMRockB,gMBush,gMLog,gMStump;
+struct DecorInst { const Model* m; float x,y,z,s,rot; };
+static std::vector<DecorInst> gDecorInst;
+
 // ---------------- ワールド構築(表示リスト) ----------------
 static GLuint gTerrainList=0, gDecorList=0, gHamList=0;
 
@@ -332,8 +392,10 @@ static void buildWorld(uint32_t seed){
   }
   glEndList();
 
-  // 装飾(木・岩)+障害物
+  // 装飾(木・岩・茂み・倒木・切り株)+障害物
+  // GLB変換モデルがあればインスタンス、なければ手作りプリミティブを表示リストへ
   gObstacles.clear();
+  gDecorInst.clear();
   gDecorList=glGenLists(1);
   glNewList(gDecorList, GL_COMPILE);
   for(int i=0;i<90;i++){ // 木
@@ -341,28 +403,34 @@ static void buildWorld(uint32_t seed){
     float x=cosf(ang)*r, z=sinf(ang)*r, h=groundY(x,z);
     float s=0.8f+rng.next()*0.7f;
     bool conifer = rng.next()<0.55f;
+    float rot=rng.next()*6.28f;
     if(h<WATER_Y+1.2f || h>10) continue;
-    glPushMatrix();
-    glTranslatef(x,h,z);
-    glScalef(s,s,s);
-    glColor3f(0.48f,0.36f,0.23f);
-    drawCylinder(0.12f,0.22f,1.6f,7);
-    if(conifer){
-      for(int k=0;k<3;k++){
-        glPushMatrix();
-        glTranslatef(0,1.1f+k*0.75f,0);
-        glColor3f(0.16f,0.42f+k*0.03f,0.16f);
-        drawCone(1.55f-k*0.42f,1.55f,9);
-        glPopMatrix();
-      }
+    const Model* mdl = conifer ? (gMPine.ok?&gMPine:nullptr) : (gMLeafy.ok?&gMLeafy:nullptr);
+    if(mdl){
+      gDecorInst.push_back({mdl,x,h,z, (conifer?3.9f:3.6f)*s, rot});
     } else {
       glPushMatrix();
-      glTranslatef(0,2.2f,0);
-      glColor3f(0.24f,0.5f,0.2f);
-      drawSphere(1.1f,9,7);
+      glTranslatef(x,h,z);
+      glScalef(s,s,s);
+      glColor3f(0.48f,0.36f,0.23f);
+      drawCylinder(0.12f,0.22f,1.6f,7);
+      if(conifer){
+        for(int k=0;k<3;k++){
+          glPushMatrix();
+          glTranslatef(0,1.1f+k*0.75f,0);
+          glColor3f(0.16f,0.42f+k*0.03f,0.16f);
+          drawCone(1.55f-k*0.42f,1.55f,9);
+          glPopMatrix();
+        }
+      } else {
+        glPushMatrix();
+        glTranslatef(0,2.2f,0);
+        glColor3f(0.24f,0.5f,0.2f);
+        drawSphere(1.1f,9,7);
+        glPopMatrix();
+      }
       glPopMatrix();
     }
-    glPopMatrix();
     gObstacles.push_back({x,z,0.4f*s,h+1.6f*s});
   }
   for(int i=0;i<26;i++){ // 岩
@@ -370,13 +438,61 @@ static void buildWorld(uint32_t seed){
     float x=cosf(ang)*r, z=sinf(ang)*r, h=groundY(x,z);
     if(h<WATER_Y+0.3f) continue;
     float rad=1.0f+rng.next()*1.8f;
-    glPushMatrix();
-    glTranslatef(x,h+rad*0.25f,z);
-    glScalef(1,0.75f,1);
-    glColor3f(0.45f,0.44f,0.42f);
-    drawSphere(rad,8,6);
-    glPopMatrix();
+    bool typeA = rng.next()<0.5f;
+    float rot=rng.next()*6.28f;
+    const Model* mdl = typeA ? (gMRockA.ok?&gMRockA:(gMRockB.ok?&gMRockB:nullptr))
+                             : (gMRockB.ok?&gMRockB:(gMRockA.ok?&gMRockA:nullptr));
+    if(mdl){
+      gDecorInst.push_back({mdl,x,h-0.05f,z, (mdl==&gMRockA?0.9f:1.6f)*rad, rot});
+    } else {
+      glPushMatrix();
+      glTranslatef(x,h+rad*0.25f,z);
+      glScalef(1,0.75f,1);
+      glColor3f(0.45f,0.44f,0.42f);
+      drawSphere(rad,8,6);
+      glPopMatrix();
+    }
     gObstacles.push_back({x,z,rad*0.9f,h+rad*1.1f});
+  }
+  for(int i=0;i<34;i++){ // 茂み(装飾のみ)
+    float ang=rng.next()*6.28f, r=5+rng.next()*96;
+    float x=cosf(ang)*r, z=sinf(ang)*r, h=groundY(x,z);
+    float s=0.4f+rng.next()*0.5f;
+    float rot=rng.next()*6.28f;
+    if(h<WATER_Y+0.5f) continue;
+    if(gMBush.ok){
+      gDecorInst.push_back({&gMBush,x,h-0.03f,z, 1.4f*s, rot});
+    } else {
+      glPushMatrix();
+      glTranslatef(x,h+s*0.5f,z);
+      glScalef(1,0.7f,1);
+      glColor3f(0.2f,0.42f,0.17f);
+      drawSphere(s,8,6);
+      glPopMatrix();
+    }
+  }
+  for(int i=0;i<8;i++){ // 倒木
+    float ang=rng.next()*6.28f, r=6+rng.next()*88;
+    float x=cosf(ang)*r, z=sinf(ang)*r, h=groundY(x,z);
+    float len=1.8f+rng.next()*1.6f;
+    float rot=rng.next()*6.28f;
+    if(h<WATER_Y+0.8f || h>5) continue;
+    if(gMLog.ok) gDecorInst.push_back({&gMLog,x,h-0.02f,z, len/2.3f, rot});
+    gObstacles.push_back({x,z,0.55f,h+0.5f});
+  }
+  for(int i=0;i<6;i++){ // 切り株
+    float ang=rng.next()*6.28f, r=6+rng.next()*88;
+    float x=cosf(ang)*r, z=sinf(ang)*r, h=groundY(x,z);
+    if(h<WATER_Y+0.8f || h>5) continue;
+    if(gMStump.ok) gDecorInst.push_back({&gMStump,x,h-0.03f,z, 0.62f, ang*3});
+    else {
+      glPushMatrix();
+      glTranslatef(x,h,z);
+      glColor3f(0.4f,0.29f,0.18f);
+      drawCylinder(0.24f,0.3f,0.45f,8);
+      glPopMatrix();
+    }
+    gObstacles.push_back({x,z,0.38f,h+0.55f});
   }
   glEndList();
 
@@ -430,6 +546,16 @@ int main(){
   glFogfv(GL_FOG_COLOR,fogCol);
   glFogi(GL_FOG_MODE,GL_LINEAR);
   glFogf(GL_FOG_START,60); glFogf(GL_FOG_END,265);
+
+  // GLB変換モデル(assets_native/*.ham)を読み込み — 無ければ手作りモデルで続行
+  gMHam  =loadHam("hamster.ham");
+  gMPine =loadHam("pine.ham");
+  gMLeafy=loadHam("leafy.ham");
+  gMRockA=loadHam("rock_a.ham");
+  gMRockB=loadHam("rock_b.ham");
+  gMBush =loadHam("bush.ham");
+  gMLog  =loadHam("log.ham");
+  gMStump=loadHam("stump.ham");
 
   buildWorld(1234567u);
   me.feetY=groundY(me.x,me.z);
@@ -543,6 +669,15 @@ int main(){
 
     glCallList(gTerrainList);
     glCallList(gDecorList);
+    // GLB変換モデルのインスタンス
+    for(const DecorInst& di : gDecorInst){
+      glPushMatrix();
+      glTranslatef(di.x,di.y,di.z);
+      glRotatef(di.rot*180/PI,0,1,0);
+      glScalef(di.s,di.s,di.s);
+      drawModel(*di.m);
+      glPopMatrix();
+    }
 
     // 的
     for(const Dummy& d : gDummies){
@@ -556,8 +691,13 @@ int main(){
         float k=1-d.dying/0.55f;
         glRotatef(k*k*86,0,0,1); // コテンと倒れる
       }
-      glScalef(0.92f,0.92f,0.92f);
-      glCallList(gHamList);
+      if(gMHam.ok){
+        glScalef(1.19f,1.19f,1.19f);
+        drawModel(gMHam);
+      } else {
+        glScalef(0.92f,0.92f,0.92f);
+        glCallList(gHamList);
+      }
       glPopMatrix();
     }
 
