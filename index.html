@@ -877,15 +877,25 @@ function buildWorld(rng){
     scene.add(top);
     obstacles.push({x,z,rr:0.32,top:h+0.5});
   }
-  // 茂み
+  // 茂み(GLB or 手作り)— 乱数消費は両パスで同一
   for(let i=0;i<34;i++){
     const ang=rng()*6.28, r=5+rng()*96, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
     if(groundY(x,z)<WATER_Y+0.5) continue;
     const s=0.4+rng()*0.5;
-    const b=new THREE.Mesh(jitterGeo(new THREE.SphereGeometry(s,8,7), s*0.3),
-      new THREE.MeshLambertMaterial({color:new THREE.Color().setHSL(0.27+rng()*0.07,0.38+rng()*0.12,0.22+rng()*0.08)}));
-    b.position.set(x, groundY(x,z)+s*0.5, z); b.scale.y=0.7;
-    scene.add(b);
+    const c1=rng(), c2=rng(), c3=rng();
+    if(bushParts){
+      const g=new THREE.Group();
+      for(const p of bushParts) g.add(new THREE.Mesh(p.geo, p.mat));
+      g.scale.setScalar(1.4*s*(0.9+c2*0.3));
+      g.rotation.y=c1*6.28;
+      g.position.set(x, groundY(x,z)-0.03, z);
+      scene.add(g);
+    } else {
+      const b=new THREE.Mesh(jitterGeo(new THREE.SphereGeometry(s,8,7), s*0.3),
+        new THREE.MeshLambertMaterial({color:new THREE.Color().setHSL(0.27+c1*0.07,0.38+c2*0.12,0.22+c3*0.08)}));
+      b.position.set(x, groundY(x,z)+s*0.5, z); b.scale.y=0.7;
+      scene.add(b);
+    }
   }
   // 草(インスタンス描画で大量に)
   const grassGeo=new THREE.ConeGeometry(0.05,0.55,4);
@@ -1079,6 +1089,8 @@ loadModelParts('assets/pine.glb', p=>{ pineParts=p; });
 loadModelParts('assets/leafy.glb', p=>{ leafyParts=p; });
 loadModelParts('assets/rock_a.glb', p=>{ rockAParts=p; });
 loadModelParts('assets/rock_b.glb', p=>{ rockBParts=p; });
+let bushParts=null;
+loadModelParts('assets/bush.glb', p=>{ bushParts=p; });
 
 // ---------------- 3Dハムスターモデル(GLB) ----------------
 let hamGLB=null, hamClips=[];
