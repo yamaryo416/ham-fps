@@ -29,6 +29,11 @@
     display:none; background:rgba(8,10,16,0.7); border:1.5px solid #3a3f4e; border-radius:10px;
     color:#9aa0b0; font-family:inherit; font-weight:700; font-size:13px; padding:8px 14px; z-index:21; touch-action:none; }
   .btn-ghost { background:transparent; border:1.5px solid #3a3f4e; color:#9aa0b0; font-size:15px; padding:12px 20px; }
+  .setRow { width:min(300px,80vw); text-align:left; }
+  .setLbl { font-size:13px; color:#c8cdd8; font-weight:700; margin-bottom:6px; display:flex; justify-content:space-between; }
+  .setLbl span { color:#ffd166; }
+  .setRow input[type=range] { width:100%; accent-color:#5aa5e8; height:28px; }
+  #relFireBtn.on { border-color:#5ad0a5; color:#8ae8c0; }
   #codeInput { font-family:inherit; font-size:30px; font-weight:700; letter-spacing:0.4em; text-align:center;
     width:min(240px,70vw); padding:12px; border-radius:14px; border:1.5px solid #3a3f4e; background:#1d2029; color:#fff; outline:none; }
   #codeInput:focus { border-color:#5aa5e8; }
@@ -165,7 +170,25 @@
   <button class="btn btn-blue" id="btnCreate">部屋を作る(きんくまチーム)</button>
   <button class="btn btn-pink" id="btnJoinMenu">部屋に入る(しろくまチーム)</button>
   <button class="btn btn-green" id="btnTrain">射撃訓練場(ひとりで練習)</button>
+  <button class="btn btn-ghost" id="btnSettings">⚙ 設定</button>
   <p class="sub">スマホは横向き推奨 / パソコンはWASD+マウス+1〜4キー<br>Q=のぞく / C=匍匐 / B=バッグ / H=回復</p>
+</div>
+
+<div id="setScreen" class="screen hidden">
+  <h1 style="font-size:24px;">設定</h1>
+  <div class="setRow">
+    <div class="setLbl">視点移動の感度 <span id="sensVal">100%</span></div>
+    <input type="range" id="sensSlider" min="30" max="220" step="10">
+  </div>
+  <div class="setRow">
+    <div class="setLbl">のぞき時の視点感度 <span id="adsSensVal">100%</span></div>
+    <input type="range" id="adsSensSlider" min="30" max="220" step="10">
+  </div>
+  <div class="setRow">
+    <div class="setLbl">視点スティックを離したら発射</div>
+    <button class="btn btn-ghost" id="relFireBtn" style="width:100%;">ON</button>
+  </div>
+  <button class="btn btn-blue" id="btnSetBack">もどる</button>
 </div>
 
 <div id="waitScreen" class="screen hidden">
@@ -253,7 +276,7 @@ function segPointDist(ax,ay,az,bx,by,bz,px,py,pz){
 
 // ---------------- 通信 ----------------
 let peer=null, conn=null, isHost=false, state='menu', seed=0;
-function show(id){ for(const s of ['menuScreen','waitScreen','joinScreen','lostScreen']) $(s).classList.add('hidden'); if(id) $(id).classList.remove('hidden'); }
+function show(id){ for(const s of ['menuScreen','waitScreen','joinScreen','lostScreen','setScreen']) $(s).classList.add('hidden'); if(id) $(id).classList.remove('hidden'); }
 function send(o){ if(conn && conn.open) conn.send(o); }
 $('btnCreate').onclick = () => { isHost=true; show('waitScreen'); makeHostPeer(); };
 function makeHostPeer(){
@@ -267,6 +290,29 @@ function makeHostPeer(){
   });
 }
 $('btnJoinMenu').onclick = ()=>{ isHost=false; show('joinScreen'); setTimeout(()=>$('codeInput').focus(),100); };
+
+// ---------------- 設定(localStorageに保存) ----------------
+const SETTINGS={sens:1.0, adsSens:1.0, relFire:true};
+try{
+  const sv=JSON.parse(localStorage.getItem('hamfps_settings')||'{}');
+  if(typeof sv.sens==='number') SETTINGS.sens=clamp(sv.sens,0.3,2.2);
+  if(typeof sv.adsSens==='number') SETTINGS.adsSens=clamp(sv.adsSens,0.3,2.2);
+  if(typeof sv.relFire==='boolean') SETTINGS.relFire=sv.relFire;
+}catch(e){}
+function saveSettings(){ try{ localStorage.setItem('hamfps_settings', JSON.stringify(SETTINGS)); }catch(e){} }
+function refreshSettingsUI(){
+  $('sensSlider').value=Math.round(SETTINGS.sens*100);
+  $('adsSensSlider').value=Math.round(SETTINGS.adsSens*100);
+  $('sensVal').textContent=Math.round(SETTINGS.sens*100)+'%';
+  $('adsSensVal').textContent=Math.round(SETTINGS.adsSens*100)+'%';
+  $('relFireBtn').textContent=SETTINGS.relFire?'ON':'OFF';
+  $('relFireBtn').classList.toggle('on',SETTINGS.relFire);
+}
+$('btnSettings').onclick=()=>{ refreshSettingsUI(); show('setScreen'); };
+$('btnSetBack').onclick=()=>show('menuScreen');
+$('sensSlider').addEventListener('input', e=>{ SETTINGS.sens=(+e.target.value)/100; $('sensVal').textContent=e.target.value+'%'; saveSettings(); });
+$('adsSensSlider').addEventListener('input', e=>{ SETTINGS.adsSens=(+e.target.value)/100; $('adsSensVal').textContent=e.target.value+'%'; saveSettings(); });
+$('relFireBtn').onclick=()=>{ SETTINGS.relFire=!SETTINGS.relFire; refreshSettingsUI(); saveSettings(); };
 $('btnTrain').onclick = ()=>{ isHost=true; training=true; seed=(Math.random()*1e9)|0; audioInit(); startGame(); };
 $('exitBtn').onclick = ()=>location.reload();
 $('btnJoin').onclick = ()=>{
@@ -2602,8 +2648,8 @@ function touchEnd(e){
     if(t.identifier===mv.id){ mv.id=-1; mv.dx=0; mv.dy=0; stickHide(moveBase,moveKnob); }
     if(t.identifier===aim.id){
       aim.id=-1; aim.dx=0; aim.dy=0; stickHide(aimBase,aimKnob);
-      // しせん操作の指を離したら1発撃つ(銃を持っているときだけ)
-      if(state==='playing' && me.sel<2 && me.healT<=0) fire();
+      // しせん操作の指を離したら1発撃つ(銃を持っているとき・設定ONのときだけ)
+      if(SETTINGS.relFire && state==='playing' && me.sel<2 && me.healT<=0) fire();
     }
   }
 }
@@ -2638,7 +2684,7 @@ layer.addEventListener('mousedown', e=>{
 addEventListener('mouseup', ()=>{ firing=false; });
 addEventListener('mousemove', e=>{
   if(!document.pointerLockElement) return;
-  const sens=0.0022*(camera?(camera.fov/72)*(me.zoom?0.5:1):1);
+  const sens=0.0022*(camera?(camera.fov/72)*(me.zoom?0.5*SETTINGS.adsSens:SETTINGS.sens):1);
   me.yaw -= e.movementX*sens;
   me.pitch = clamp(me.pitch-e.movementY*sens,-1.15,1.15);
 });
@@ -2678,7 +2724,7 @@ function loop(t){
   if(me.prot<=0 && $('hpLabel').textContent.includes('保護')) updBars();
 
   if(state==='playing'){
-    const sens=(camera.fov/72)*(me.zoom?0.5:1);
+    const sens=(camera.fov/72)*(me.zoom?0.5*SETTINGS.adsSens:SETTINGS.sens);
     me.yaw   -= (aim.dx/AR)*2.6*dt*sens;
     me.pitch  = clamp(me.pitch-(aim.dy/AR)*1.8*dt*sens, -1.15, 1.15);
     if(isHost){
