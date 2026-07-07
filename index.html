@@ -849,18 +849,29 @@ function buildWorld(rng){
     }
     if(!ok) continue;
     const h=groundY(x,z), len=1.8+rng()*1.6, rad=0.16+rng()*0.1;
-    const lg=new THREE.CylinderGeometry(rad,rad*1.2,len,7);
-    lg.rotateZ(Math.PI/2);
-    const log=new THREE.Mesh(lg, barkMat);
-    log.position.set(x, h+rad*0.8, z);
-    log.rotation.y=rng()*6.28; log.rotation.x=(rng()-0.5)*0.1;
-    scene.add(log);
-    if(rng()<0.7){
-      const moss=new THREE.Mesh(jitterGeo(new THREE.SphereGeometry(rad*1.6,8,6), rad*0.4),
-        new THREE.MeshLambertMaterial({color:0x4a6b30}));
-      moss.scale.set(1.6,0.35,1);
-      moss.position.set(x+(rng()-0.5)*len*0.4, h+rad*1.6, z+(rng()-0.5)*len*0.4);
-      scene.add(moss);
+    const rotY=rng()*6.28, rotX=(rng()-0.5)*0.1;
+    if(logParts){
+      const g=new THREE.Group();
+      for(const p of logParts) g.add(new THREE.Mesh(p.geo, p.mat));
+      g.scale.setScalar(len/2.3); // モデルは高さ1に正規化済み(長さ≒2.3)
+      g.rotation.y=rotY; g.rotation.x=rotX;
+      g.position.set(x, h-0.02, z);
+      scene.add(g);
+      if(rng()<0.7){ rng(); rng(); } // 手作りパスと乱数消費を揃える
+    } else {
+      const lg=new THREE.CylinderGeometry(rad,rad*1.2,len,7);
+      lg.rotateZ(Math.PI/2);
+      const log=new THREE.Mesh(lg, barkMat);
+      log.position.set(x, h+rad*0.8, z);
+      log.rotation.y=rotY; log.rotation.x=rotX;
+      scene.add(log);
+      if(rng()<0.7){
+        const moss=new THREE.Mesh(jitterGeo(new THREE.SphereGeometry(rad*1.6,8,6), rad*0.4),
+          new THREE.MeshLambertMaterial({color:0x4a6b30}));
+        moss.scale.set(1.6,0.35,1);
+        moss.position.set(x+(rng()-0.5)*len*0.4, h+rad*1.6, z+(rng()-0.5)*len*0.4);
+        scene.add(moss);
+      }
     }
     obstacles.push({x,z,rr:0.55,top:h+rad*2.2});
   }
@@ -868,14 +879,24 @@ function buildWorld(rng){
     const ang=rng()*6.28, r=6+rng()*88, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
     const h=groundY(x,z);
     if(h<WATER_Y+0.8 || h>5) continue;
-    const st=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.3,0.45,8), barkMatD);
-    st.position.set(x, h+0.22, z);
-    scene.add(st);
-    const top=new THREE.Mesh(new THREE.CylinderGeometry(0.23,0.23,0.03,8),
-      new THREE.MeshLambertMaterial({color:0xc7ac82}));
-    top.position.set(x, h+0.45, z);
-    scene.add(top);
-    obstacles.push({x,z,rr:0.32,top:h+0.5});
+    if(stumpParts){
+      const g=new THREE.Group();
+      for(const p of stumpParts) g.add(new THREE.Mesh(p.geo, p.mat));
+      g.scale.setScalar(0.62);
+      g.rotation.y=ang*3; // 引いた乱数を向きに再利用
+      g.position.set(x, h-0.03, z);
+      scene.add(g);
+      obstacles.push({x,z,rr:0.38,top:h+0.55});
+    } else {
+      const st=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.3,0.45,8), barkMatD);
+      st.position.set(x, h+0.22, z);
+      scene.add(st);
+      const top=new THREE.Mesh(new THREE.CylinderGeometry(0.23,0.23,0.03,8),
+        new THREE.MeshLambertMaterial({color:0xc7ac82}));
+      top.position.set(x, h+0.45, z);
+      scene.add(top);
+      obstacles.push({x,z,rr:0.38,top:h+0.55});
+    }
   }
   // 茂み(GLB or 手作り)— 乱数消費は両パスで同一
   for(let i=0;i<34;i++){
@@ -1089,8 +1110,10 @@ loadModelParts('assets/pine.glb', p=>{ pineParts=p; });
 loadModelParts('assets/leafy.glb', p=>{ leafyParts=p; });
 loadModelParts('assets/rock_a.glb', p=>{ rockAParts=p; });
 loadModelParts('assets/rock_b.glb', p=>{ rockBParts=p; });
-let bushParts=null;
+let bushParts=null, logParts=null, stumpParts=null;
 loadModelParts('assets/bush.glb', p=>{ bushParts=p; });
+loadModelParts('assets/log.glb', p=>{ logParts=p; });
+loadModelParts('assets/stump.glb', p=>{ stumpParts=p; });
 
 // ---------------- 3Dハムスターモデル(GLB) ----------------
 let hamGLB=null, hamClips=[];
