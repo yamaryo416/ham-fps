@@ -730,25 +730,41 @@ function buildWorld(rng){
     obstacles.push({x,z,rr:0.4*s,top:base+1.6*s});
   }
   function addLeafTree(x,z,base,s){
-    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.13*s,0.24*s,2.0*s,7), barkMatD);
-    trunk.position.set(x, base+1.0*s, z);
-    trunk.rotation.z=(rng()-0.5)*0.14; trunk.rotation.x=(rng()-0.5)*0.1;
-    scene.add(trunk);
-    for(const sx of[-1,1]) if(rng()<0.8){
-      const br=new THREE.Mesh(new THREE.CylinderGeometry(0.04*s,0.08*s,0.9*s,5), barkMatD);
-      br.position.set(x+0.38*s*sx, base+1.8*s, z+(rng()-0.5)*0.3*s);
-      br.rotation.z=-sx*(0.7+rng()*0.4);
-      scene.add(br);
-    }
-    const hue=0.24+rng()*0.09, sat=0.4+rng()*0.15;
-    const n=3+((rng()*3)|0);
-    for(let k=0;k<n;k++){
-      const br2=(0.7+rng()*0.5)*s;
-      const bl=new THREE.Mesh(jitterGeo(new THREE.SphereGeometry(br2,9,7), br2*0.3),
-        new THREE.MeshLambertMaterial({color:new THREE.Color().setHSL(hue,sat,0.23+rng()*0.09)}));
-      bl.position.set(x+(rng()-0.5)*1.3*s, base+2.3*s+(rng()-0.35)*0.8*s, z+(rng()-0.5)*1.3*s);
-      bl.scale.y=0.75+rng()*0.2;
-      scene.add(bl);
+    if(leafyParts){
+      // 手作りパスと同じ回数だけ乱数を消費してP2P同期を保つ
+      const rz=(rng()-0.5)*0.14; rng();
+      for(const sx of[-1,1]) if(rng()<0.8){ rng(); rng(); }
+      const hue=0.24+rng()*0.09; rng();
+      const n=3+((rng()*3)|0);
+      for(let k=0;k<n;k++){ rng();rng();rng();rng();rng();rng(); }
+      const g=new THREE.Group();
+      for(const p of leafyParts) g.add(new THREE.Mesh(p.geo, p.mat));
+      g.scale.setScalar(3.6*s);
+      g.rotation.y=hue*120;
+      g.rotation.z=rz*0.6;
+      g.position.set(x, base, z);
+      scene.add(g);
+    } else {
+      const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.13*s,0.24*s,2.0*s,7), barkMatD);
+      trunk.position.set(x, base+1.0*s, z);
+      trunk.rotation.z=(rng()-0.5)*0.14; trunk.rotation.x=(rng()-0.5)*0.1;
+      scene.add(trunk);
+      for(const sx of[-1,1]) if(rng()<0.8){
+        const br=new THREE.Mesh(new THREE.CylinderGeometry(0.04*s,0.08*s,0.9*s,5), barkMatD);
+        br.position.set(x+0.38*s*sx, base+1.8*s, z+(rng()-0.5)*0.3*s);
+        br.rotation.z=-sx*(0.7+rng()*0.4);
+        scene.add(br);
+      }
+      const hue=0.24+rng()*0.09, sat=0.4+rng()*0.15;
+      const n=3+((rng()*3)|0);
+      for(let k=0;k<n;k++){
+        const br2=(0.7+rng()*0.5)*s;
+        const bl=new THREE.Mesh(jitterGeo(new THREE.SphereGeometry(br2,9,7), br2*0.3),
+          new THREE.MeshLambertMaterial({color:new THREE.Color().setHSL(hue,sat,0.23+rng()*0.09)}));
+        bl.position.set(x+(rng()-0.5)*1.3*s, base+2.3*s+(rng()-0.35)*0.8*s, z+(rng()-0.5)*1.3*s);
+        bl.scale.y=0.75+rng()*0.2;
+        scene.add(bl);
+      }
     }
     obstacles.push({x,z,rr:0.42*s,top:base+2.0*s});
   }
@@ -1041,8 +1057,9 @@ function loadModelParts(url, done){
     }, undefined, e=>console.warn(url+' 読み込み失敗(手作りで続行)', e));
   }catch(e){ console.warn(e); }
 }
-let pineParts=null;
+let pineParts=null, leafyParts=null;
 loadModelParts('assets/pine.glb', p=>{ pineParts=p; });
+loadModelParts('assets/leafy.glb', p=>{ leafyParts=p; });
 
 // ---------------- 3Dハムスターモデル(GLB) ----------------
 let hamGLB=null, hamClips=[];
