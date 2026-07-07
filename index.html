@@ -1154,6 +1154,18 @@ function makeHamModel(hostSide){
   g.add(inst);
   const ud=g.userData;
   ud.phase=0; ud.amp=0; ud.flz=0;
+  // 匍匐ポーズ用に主要な骨を拾っておく
+  ud.bones={};
+  inst.traverse(o=>{
+    if(o.isBone){
+      if(o.name==='Head') ud.bones.head=o;
+      else if(o.name==='Spine02') ud.bones.spine=o;
+      else if(o.name==='L_Upperarm') ud.bones.lArm=o;
+      else if(o.name==='R_Upperarm') ud.bones.rArm=o;
+      else if(o.name==='L_Thigh') ud.bones.lLeg=o;
+      else if(o.name==='R_Thigh') ud.bones.rLeg=o;
+    }
+  });
   if(hamClips.length){
     ud.mixer=new THREE.AnimationMixer(inst);
     const clips=[...hamClips].sort((a,b)=>a.duration-b.duration);
@@ -1163,6 +1175,18 @@ function makeHamModel(hostSide){
     ud.walkOn=false;
   }
   return g;
+}
+// 匍匐ポーズ+這いずり: ミキサー更新の後に骨へ上書きする
+function applyCrawl(ud, pr, phase, amp){
+  if(!ud.bones || pr<=0.01) return;
+  const b=ud.bones;
+  const sw=Math.sin(phase*2.4)*0.5*amp*pr; // 這いずりの手足スイング
+  if(b.head)  b.head.rotation.x  -= 1.05*pr;          // 頭を起こして前を見る
+  if(b.spine) b.spine.rotation.x += 0.15*pr;
+  if(b.lArm){ b.lArm.rotation.x  -= (1.1)*pr; b.lArm.rotation.z += sw; }
+  if(b.rArm){ b.rArm.rotation.x  -= (1.1)*pr; b.rArm.rotation.z -= sw; }
+  if(b.lLeg)  b.lLeg.rotation.x  += (0.9)*pr + sw*0.6;
+  if(b.rLeg)  b.rLeg.rotation.x  += (0.9)*pr - sw*0.6;
 }
 function hamModel(hostSide){
   return hamGLB ? makeHamModel(hostSide) : buildHamster(hostSide);
@@ -2504,6 +2528,7 @@ function loop(t){
     }
     if(ud.actWalk) ud.actWalk.timeScale=clamp(fsp/4,0.7,2.2);
     ud.mixer.update(dt);
+    applyCrawl(ud, foe.pr, ud.phase, Math.max(ud.amp,0.3));
   }
   foeStepAcc+=fMove;
   if(foeStepAcc>2.2){
@@ -2514,7 +2539,7 @@ function loop(t){
   const fg=groundY(foe.x,foe.z);
   const fBase=(fg<WATER_Y && foe.fy<WATER_Y) ? WATER_Y-0.5 : foe.fy;
   foeMesh.position.set(foe.x,
-    fBase+Math.abs(Math.sin(ud.phase))*(ud.mixer?0.015:0.06)*ud.amp*(1-foe.pr)+0.22*foe.pr, foe.z);
+    fBase+Math.abs(Math.sin(ud.phase))*(ud.mixer?0.015:0.06)*ud.amp*(1-foe.pr)+(ud.mixer?0.08:0.22)*foe.pr, foe.z);
   foeMesh.rotation.y=foe.a+Math.PI;
   foeMesh.rotation.z=Math.sin(ud.phase)*0.05*ud.amp*(1-foe.pr);
   foeMesh.rotation.x=-1.15*foe.pr;
