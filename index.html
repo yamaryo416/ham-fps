@@ -10,6 +10,8 @@
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="assets/GLTFLoader.js"></script>
+<script src="assets/SkeletonUtils.js"></script>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; }
   html, body { height:100%; overflow:hidden; overscroll-behavior:none; touch-action:none;
@@ -979,7 +981,7 @@ function buildWorld(rng){
   for(let i=0;i<2;i++) addItem(id++,'noz',0);
   for(let i=0;i<2;i++) addItem(id++,'stk',0);
 
-  foeMesh=buildHamster(!isHost);
+  foeMesh=hamModel(!isHost);
   scene.add(foeMesh);
   gunGroup=new THREE.Group();
   camera.add(gunGroup); scene.add(camera);
@@ -988,7 +990,85 @@ function buildWorld(rng){
   buildViewModel();
 }
 
-// ---------------- ハムスター ----------------
+// ---------------- 3Dハムスターモデル(GLB) ----------------
+let hamGLB=null, hamClips=[];
+(function loadHamModel(){
+  if(!window.THREE || !THREE.GLTFLoader) return;
+  try{
+    new THREE.GLTFLoader().load('assets/hamster.glb', g=>{
+      const root=g.scene;
+      root.traverse(o=>{
+        if(o.isMesh||o.isSkinnedMesh){
+          const map=(o.material&&o.material.map)||null;
+          if(map) map.encoding=THREE.LinearEncoding;
+          const m=new THREE.MeshLambertMaterial({map});
+          if(o.isSkinnedMesh) m.skinning=true;
+          o.material=m;
+          o.frustumCulled=false;
+        }
+      });
+      hamGLB=root;
+      hamClips=g.animations||[];
+      swapHamsters();
+    }, undefined, e=>{ console.warn('hamster.glb 読み込み失敗(手作りモデルで続行)', e); });
+  }catch(e){ console.warn(e); }
+})();
+function makeHamModel(hostSide){
+  const inst=THREE.SkeletonUtils.clone(hamGLB);
+  const g=new THREE.Group();
+  inst.scale.setScalar(1.25); // 元の高さ0.95 → 約1.19
+  // チーム識別: きんくま=そのまま / しろくま=ピンクがかった色味
+  if(!hostSide){
+    inst.traverse(o=>{
+      if(o.isMesh||o.isSkinnedMesh){
+        o.material=o.material.clone();
+        o.material.color.setRGB(1.0,0.74,0.82);
+      }
+    });
+  }
+  g.add(inst);
+  const ud=g.userData;
+  ud.phase=0; ud.amp=0; ud.flz=0;
+  if(hamClips.length){
+    ud.mixer=new THREE.AnimationMixer(inst);
+    const clips=[...hamClips].sort((a,b)=>a.duration-b.duration);
+    ud.actWalk=ud.mixer.clipAction(clips[0]);              // 短い方=歩きサイクル
+    ud.actIdle=ud.mixer.clipAction(clips[clips.length-1]); // 長い方=待機
+    ud.actIdle.play();
+    ud.walkOn=false;
+  }
+  return g;
+}
+function hamModel(hostSide){
+  return hamGLB ? makeHamModel(hostSide) : buildHamster(hostSide);
+}
+// 読み込み完了時、表示中のハムスターをGLBに差し替える
+function swapHamsters(){
+  if(!scene || !hamGLB) return;
+  if(foeMesh){
+    const old=foeMesh;
+    foeMesh=makeHamModel(!isHost);
+    foeMesh.position.copy(old.position);
+    foeMesh.rotation.copy(old.rotation);
+    foeMesh.visible=old.visible;
+    scene.add(foeMesh);
+    scene.remove(old);
+  }
+  for(const dm of dummies){
+    const old=dm.mesh;
+    dm.mesh=makeHamModel(dummies.indexOf(dm)%2===1);
+    const lb=makeLabelSprite('まと','#ffd166');
+    lb.position.y=1.9; lb.scale.set(1.4,0.35,1);
+    dm.mesh.add(lb);
+    dm.mesh.position.copy(old.position);
+    dm.mesh.rotation.copy(old.rotation);
+    dm.mesh.visible=old.visible;
+    scene.add(dm.mesh);
+    scene.remove(old);
+  }
+}
+
+// ---------------- ハムスター(手作りフォールバック) ----------------
 function buildHamster(hostSide){
   const fur  = hostSide ? 0xd9a45e : 0xf2e6d4;
   const furD = hostSide ? 0xb07f3e : 0xd2bd9c;
@@ -1560,7 +1640,7 @@ function spawnDummies(){
   const offs=[[0,-10],[-6,-9],[6,-9],[-3,-14],[3,-14]];
   for(let i=0;i<offs.length;i++){
     const sp=safeSpot(cx+offs[i][0], cz+offs[i][1]);
-    const m=buildHamster(i%2===1);
+    const m=hamModel(i%2===1);
     const lb=makeLabelSprite('まと','#ffd166');
     lb.position.y=1.9; lb.scale.set(1.4,0.35,1);
     m.add(lb);
@@ -2286,8 +2366,20 @@ function loop(t){
   const fsp=dt>0?fMove/dt:0;
   ud.amp+=((fsp>0.6?1:0)-ud.amp)*Math.min(1,dt*8);
   ud.phase+=Math.min(fsp,8)*dt*2.6;
-  ud.footL.position.z=ud.flz+Math.sin(ud.phase)*0.15*ud.amp;
-  ud.footR.position.z=ud.flz-Math.sin(ud.phase)*0.15*ud.amp;
+  if(ud.footL){ // 手作りモデル: 足を交互に振る
+    ud.footL.position.z=ud.flz+Math.sin(ud.phase)*0.15*ud.amp;
+    ud.footR.position.z=ud.flz-Math.sin(ud.phase)*0.15*ud.amp;
+  }
+  if(ud.mixer){ // GLBモデル: 歩き/待機アニメをクロスフェード
+    const moving=fsp>0.6;
+    if(moving!==ud.walkOn){
+      ud.walkOn=moving;
+      const to=moving?ud.actWalk:ud.actIdle, from=moving?ud.actIdle:ud.actWalk;
+      if(to&&from){ from.fadeOut(0.18); to.reset().fadeIn(0.18).play(); }
+    }
+    if(ud.actWalk) ud.actWalk.timeScale=clamp(fsp/4,0.7,2.2);
+    ud.mixer.update(dt);
+  }
   foeStepAcc+=fMove;
   if(foeStepAcc>2.2){
     foeStepAcc=0;
@@ -2297,7 +2389,7 @@ function loop(t){
   const fg=groundY(foe.x,foe.z);
   const fBase=(fg<WATER_Y && foe.fy<WATER_Y) ? WATER_Y-0.5 : foe.fy;
   foeMesh.position.set(foe.x,
-    fBase+Math.abs(Math.sin(ud.phase))*0.06*ud.amp*(1-foe.pr)+0.22*foe.pr, foe.z);
+    fBase+Math.abs(Math.sin(ud.phase))*(ud.mixer?0.015:0.06)*ud.amp*(1-foe.pr)+0.22*foe.pr, foe.z);
   foeMesh.rotation.y=foe.a+Math.PI;
   foeMesh.rotation.z=Math.sin(ud.phase)*0.05*ud.amp*(1-foe.pr);
   foeMesh.rotation.x=-1.15*foe.pr;
@@ -2308,6 +2400,7 @@ function loop(t){
         dm.down-=dt;
         if(dm.down<=0){ dm.hp=100; dm.mesh.visible=true; puff(new THREE.Vector3(dm.x,groundY(dm.x,dm.z)+0.8,dm.z),0xffffff,0.5); }
       }
+      if(dm.mesh.userData.mixer) dm.mesh.userData.mixer.update(dt);
     }
   }
   updateDmgNums(dt);
