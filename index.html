@@ -139,6 +139,9 @@
   .slot.empty { color:rgba(255,255,255,0.28); }
   #throwBtn { position:absolute; left:calc(50% + 70px); bottom:calc(40px + env(safe-area-inset-bottom));
     width:58px; z-index:21; }
+  #healBtn { position:absolute; left:calc(50% - 128px); bottom:calc(40px + env(safe-area-inset-bottom));
+    width:58px; z-index:21; }
+  #healBtn.using { border-color:rgba(90,208,165,0.9); background:rgba(18,60,44,0.5); color:#8ae8c0; }
   #throwMenu { position:absolute; left:calc(50% + 70px); bottom:calc(76px + env(safe-area-inset-bottom));
     display:none; flex-direction:column; gap:5px; z-index:22; }
   .tOpt { width:118px; height:36px; border-radius:9px; border:1.5px solid rgba(255,255,255,0.35);
@@ -158,7 +161,7 @@
   <button class="btn btn-blue" id="btnCreate">部屋を作る(きんくまチーム)</button>
   <button class="btn btn-pink" id="btnJoinMenu">部屋に入る(しろくまチーム)</button>
   <button class="btn btn-green" id="btnTrain">射撃訓練場(ひとりで練習)</button>
-  <p class="sub">スマホは横向き推奨 / パソコンはWASD+マウス+1〜4キー<br>Q=のぞく / C=匍匐 / B=バッグ</p>
+  <p class="sub">スマホは横向き推奨 / パソコンはWASD+マウス+1〜4キー<br>Q=のぞく / C=匍匐 / B=バッグ / H=回復</p>
 </div>
 
 <div id="waitScreen" class="screen hidden">
@@ -207,6 +210,7 @@
     <button class="slot empty" id="slot1">ー</button>
   </div>
   <button class="slot empty" id="throwBtn">投げ物</button>
+  <button class="slot empty" id="healBtn">回復<br>💊0</button>
   <div id="throwMenu">
     <button class="tOpt" id="tOptN">グレネード ×0</button>
     <button class="tOpt" id="tOptS">煙玉 ×0</button>
@@ -300,7 +304,7 @@ const SPAWNS=[[-65,-65],[65,-65],[-65,65],[65,65]];
 let heightFn=null, obstacles=[], items=[];
 let scene,camera,renderer,foeMesh,gunGroup,muzzle,waterMesh;
 const me={x:-24,z:-24,yaw:0,pitch:0,hp:100,score:0,cd:0,prot:0,slots:[0,null],sel:0,
-  ammo:{}, mag:{}, rld:null,feetY:0,eyeY:0,zoom:false,prone:false,
+  ammo:{}, mag:{}, rld:null,feetY:0,eyeY:0,zoom:false,prone:false,healT:0,
   bag:[],
   watt:{0:{scope:null,noz:false,stk:false},1:{scope:null,noz:false,stk:false}}};
 // バッグ(8スロット・スタック制)
@@ -1142,6 +1146,8 @@ let hamGLB=null, hamClips=[];
 function makeHamModel(hostSide){
   const inst=THREE.SkeletonUtils.clone(hamGLB);
   const g=new THREE.Group();
+  g.rotation.order='YXZ'; // ヨー→ピッチの順で回す(匍匐の前傾が向きに追従する)
+  inst.rotation.y=Math.PI/2; // このGLBは正面が+X向きなので+Z向きへ補正
   inst.scale.setScalar(1.25); // 元の高さ0.95 → 約1.19
   // チーム識別: きんくま=そのまま / しろくま=ピンクがかった色味
   if(!hostSide){
@@ -1268,6 +1274,7 @@ function buildHamster(hostSide){
   const M=c=>new THREE.MeshLambertMaterial({color:c, map:ft});
   const Mp=c=>new THREE.MeshLambertMaterial({color:c});
   const g=new THREE.Group();
+  g.rotation.order='YXZ';
   // 胴体・背中の模様・おなか(スリム体型)
   const body=new THREE.Mesh(new THREE.SphereGeometry(0.52,14,12), M(fur));
   body.scale.set(0.8,0.95,1.14); body.position.y=0.6; g.add(body);
@@ -1400,7 +1407,7 @@ function zoomX(){
   return sc || 1.35;
 }
 function setZoom(z){
-  if(z && zoomX()===1) z=false;
+  if(z && (zoomX()===1 || me.healT>0)) z=false;
   me.zoom=z;
   const btn=$('adsBtn');
   if(btn){ btn.classList.toggle('on',me.zoom); btn.textContent=me.zoom?'もどす':'のぞく'; }
@@ -1443,8 +1450,10 @@ function updSlots(){
     }
   }
   $('adsBtn').disabled = zoomX()===1;
+  updHealBtn();
 }
 function selectSlot(i){
+  if(me.healT>0) return; // 回復中は持ち替え不可
   if(i===2){ if(bagCount('nade')<=0&&me.sel!==2) return; }
   else if(i===3){ if(bagCount('smoke')<=0&&me.sel!==3) return; }
   else if(me.slots[i]===null) return;
@@ -1488,6 +1497,36 @@ function setProne(p){
 }
 $('proneBtn').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); setProne(!me.prone); },{passive:false});
 $('proneBtn').addEventListener('mousedown',  e=>{ e.stopPropagation(); setProne(!me.prone); });
+
+// ---------------- 回復キット使用 ----------------
+const HEAL_TIME=5;
+function updHealBtn(){
+  const b=$('healBtn');
+  if(me.healT>0){
+    b.innerHTML='回復中<br>'+me.healT.toFixed(1)+'s';
+    b.classList.add('using'); b.classList.remove('empty');
+  } else {
+    const n=bagCount('heal');
+    b.innerHTML='回復<br>💊'+n;
+    b.classList.remove('using');
+    b.classList.toggle('empty', n===0);
+  }
+}
+function startHeal(){
+  if(state!=='playing' || me.healT>0) return;
+  if(bagCount('heal')<=0){ toast('回復キットを持っていない'); return; }
+  if(me.hp>=100){ toast('HPは満タン!'); return; }
+  me.healT=HEAL_TIME;
+  setZoom(false);
+  if(me.rld!==null){ me.rld=null; me.cd=Math.min(me.cd,0.25); }
+  if(nadeAiming){ nadeAiming=false; hideTrajectory(); }
+  sfxHealStart();
+  toast('回復中…5秒かかる(移動がおそくなる)');
+  updHealBtn();
+  if(navigator.vibrate) navigator.vibrate(10);
+}
+$('healBtn').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); startHeal(); },{passive:false});
+$('healBtn').addEventListener('mousedown',  e=>{ e.stopPropagation(); startHeal(); });
 
 // ---------------- アイテムバッグ(Apex風) ----------------
 function chip(text, cls, fn){
@@ -1758,6 +1797,7 @@ function doReset(){
   for(const p of projectiles) scene.remove(p.mesh);
   for(const n of nadesArr) scene.remove(n.mesh);
   projectiles=[]; nadesArr=[];
+  me.healT=0; nadeAiming=false; hideTrajectory();
   buildViewModel(); updBars(); updScore(); setMsg('');
   $('overlay').style.display='none';
   state='playing';
@@ -1768,6 +1808,7 @@ function respawnMe(){
   const sp=safeSpot(SPAWNS[best][0],SPAWNS[best][1]);
   me.x=sp[0]; me.z=sp[1];
   me.yaw=Math.atan2(me.x,me.z); me.hp=100; me.prot=2; me.cd=0;
+  me.healT=0; nadeAiming=false; hideTrajectory(); updHealBtn();
   resetLoadout();
   me.feetY=groundY(me.x,me.z);
   me.eyeY=me.feetY+EYE;
@@ -2080,7 +2121,7 @@ function spawnNade(origin,vel,mine,smoke){
   const mesh=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,7),
     new THREE.MeshLambertMaterial({color:smoke?0x788088:0x4a5d3a}));
   mesh.position.copy(origin); scene.add(mesh);
-  nadesArr.push({p:origin.clone(), v:vel.clone(), mesh, life:smoke?1.3:1.7, mine, smoke:!!smoke});
+  nadesArr.push({p:origin.clone(), v:vel.clone(), mesh, life:smoke?1.6:2.2, mine, smoke:!!smoke});
 }
 function puff(pos,col,size){
   const m=new THREE.Mesh(new THREE.SphereGeometry(size,7,6),
@@ -2114,7 +2155,7 @@ function explode(pos,mine){
 }
 let emptyToastT=0;
 function startReload(wi){
-  if(me.rld!==null) return;
+  if(me.rld!==null || me.healT>0) return;
   if(me.mag[wi]>=WPN[wi].mag || me.ammo[wi]<=0) return;
   me.rld=wi;
   me.cd=Math.max(me.cd, WPN[wi].rel);
@@ -2122,31 +2163,72 @@ function startReload(wi){
   updSlots();
 }
 function sfxReload(){ if(!audioInit())return; tone({f:700,f2:500,dur:0.06,vol:0.2,type:'square'}); tone({f:1000,f2:800,dur:0.06,vol:0.2,type:'square',at:0.18}); }
+// 投げ物の初速(遠くまで放物線を描く)
+function throwVec(){
+  const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+  const origin=camera.position.clone().add(dir.clone().multiplyScalar(0.6));
+  const sp = me.sel===2 ? 21 : 17;
+  const vel=dir.multiplyScalar(sp); vel.y+=5.5;
+  return {origin, vel};
+}
+// 軌道予測の点線
+let trajGroup=null, nadeAiming=false, holdLock=false;
+function ensureTraj(){
+  if(trajGroup || !scene) return;
+  trajGroup=new THREE.Group();
+  for(let i=0;i<26;i++){
+    const d=new THREE.Mesh(new THREE.SphereGeometry(0.07,6,5),
+      new THREE.MeshBasicMaterial({color:0xffd166, transparent:true, opacity:0.85, depthWrite:false}));
+    trajGroup.add(d);
+  }
+  const ring=new THREE.Mesh(new THREE.RingGeometry(0.3,0.45,20),
+    new THREE.MeshBasicMaterial({color:0xffd166, transparent:true, opacity:0.75, side:THREE.DoubleSide, depthWrite:false}));
+  ring.rotation.x=-Math.PI/2;
+  trajGroup.add(ring);
+  scene.add(trajGroup);
+}
+function updateTrajectory(){
+  ensureTraj();
+  if(!trajGroup) return;
+  trajGroup.visible=true;
+  const {origin,vel}=throwVec();
+  const p=origin.clone(), v=vel.clone();
+  const step=0.085, life=me.sel===2?2.2:1.6;
+  const ring=trajGroup.children[26];
+  let landed=false, t=0;
+  for(let i=0;i<26;i++){
+    const d=trajGroup.children[i];
+    if(landed){ d.visible=false; continue; }
+    v.y-=20*step;
+    p.addScaledVector(v,step);
+    t+=step;
+    const g=floorAt(p.x,p.z,p.y);
+    const floor=Math.max(g, g<WATER_Y?WATER_Y:g);
+    if(p.y<floor+0.13 || t>=life){
+      p.y=Math.max(p.y,floor+0.13);
+      landed=true;
+      ring.position.set(p.x,floor+0.16,p.z);
+    }
+    d.visible=true;
+    d.position.copy(p);
+  }
+  ring.visible=landed;
+  if(!landed) ring.visible=false;
+}
+function hideTrajectory(){ if(trajGroup) trajGroup.visible=false; }
+function doThrow(){
+  const smoke=me.sel===3, kind=smoke?'smoke':'nade';
+  if(bagCount(kind)<=0 || me.cd>0) return;
+  me.cd=smoke?1.2:1.1; bagConsume(kind,1); me.prot=0; gunKick=1; sfxThrow(); updSlots(); updBag();
+  if(bagCount(kind)===0){ me.sel=0; buildViewModel(); }
+  const {origin,vel}=throwVec();
+  spawnNade(origin,vel,true,smoke);
+  send({t:smoke?'smoke':'nade', x:origin.x,y:origin.y,z:origin.z, dx:vel.x,dy:vel.y,dz:vel.z});
+  if(navigator.vibrate) navigator.vibrate(15);
+}
 function fire(){
-  if(me.sel===2){
-    if(bagCount('nade')<=0 || me.cd>0) return;
-    me.cd=1.1; bagConsume('nade',1); me.prot=0; gunKick=1; sfxThrow(); updSlots(); updBag();
-    if(bagCount('nade')===0){ me.sel=0; buildViewModel(); }
-    const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-    const origin=camera.position.clone().add(dir.clone().multiplyScalar(0.6));
-    const vel=dir.multiplyScalar(15); vel.y+=3.5;
-    spawnNade(origin,vel,true,false);
-    send({t:'nade', x:origin.x,y:origin.y,z:origin.z, dx:vel.x,dy:vel.y,dz:vel.z});
-    if(navigator.vibrate) navigator.vibrate(15);
-    return;
-  }
-  if(me.sel===3){
-    if(bagCount('smoke')<=0 || me.cd>0) return;
-    me.cd=1.2; bagConsume('smoke',1); gunKick=1; sfxThrow(); updSlots(); updBag();
-    if(bagCount('smoke')===0){ me.sel=0; buildViewModel(); }
-    const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-    const origin=camera.position.clone().add(dir.clone().multiplyScalar(0.6));
-    const vel=dir.multiplyScalar(13); vel.y+=3.5;
-    spawnNade(origin,vel,true,true);
-    send({t:'smoke', x:origin.x,y:origin.y,z:origin.z, dx:vel.x,dy:vel.y,dz:vel.z});
-    if(navigator.vibrate) navigator.vibrate(15);
-    return;
-  }
+  if(me.healT>0) return; // 回復中は撃てない
+  if(me.sel>=2){ doThrow(); return; }
   const wi=me.slots[me.sel];
   if(wi===null || me.cd>0) return;
   if(me.mag[wi]<=0){
@@ -2352,6 +2434,8 @@ function sfxHitm(){ if(!audioInit())return; tone({f:1300,f2:900,dur:0.05,vol:0.2
 function sfxHurt(){ if(!audioInit())return; burst({dur:0.15,vol:0.5,f:300}); tone({f:140,f2:70,dur:0.18,vol:0.4,type:'triangle'}); }
 function sfxEmpty(){ if(!audioInit())return; tone({f:1100,f2:800,dur:0.03,vol:0.15,type:'square'}); }
 function sfxThrow(){ if(!audioInit())return; burst({dur:0.12,vol:0.15,f:1200,type:'bandpass',q:0.8}); }
+function sfxHealStart(){ if(!audioInit())return; tone({f:520,f2:660,dur:0.14,vol:0.18,type:'sine'}); }
+function sfxHeal(){ if(!audioInit())return; tone({f:660,f2:880,dur:0.12,vol:0.2,type:'sine'}); tone({f:880,f2:1100,dur:0.14,vol:0.2,type:'sine',at:0.13}); }
 function sfxPop(vol){ if(!audioInit())return; vol=clamp(vol,0,1); if(vol<0.03)return;
   burst({dur:0.06,vol:0.5*vol,f:2500,type:'bandpass',q:1.5}); tone({f:620,f2:180,dur:0.09,vol:0.3*vol,type:'square'}); }
 function sfxSmoke(vol){ if(!audioInit())return; burst({dur:0.5,vol:0.35*clamp(vol,0,1),f:600}); }
@@ -2402,7 +2486,11 @@ function touchEnd(e){
   e.preventDefault();
   for(const t of e.changedTouches){
     if(t.identifier===mv.id){ mv.id=-1; mv.dx=0; mv.dy=0; stickHide(moveBase,moveKnob); }
-    if(t.identifier===aim.id){ aim.id=-1; aim.dx=0; aim.dy=0; stickHide(aimBase,aimKnob); }
+    if(t.identifier===aim.id){
+      aim.id=-1; aim.dx=0; aim.dy=0; stickHide(aimBase,aimKnob);
+      // しせん操作の指を離したら1発撃つ(銃を持っているときだけ)
+      if(state==='playing' && me.sel<2 && me.healT<=0) fire();
+    }
   }
 }
 layer.addEventListener('touchend', touchEnd, {passive:false});
@@ -2421,6 +2509,7 @@ addEventListener('keydown', e=>{ keys[e.code]=true;
   if(e.code==='KeyC')setProne(!me.prone);
   if(e.code==='KeyR'&&me.sel<2&&me.slots[me.sel]!==null)startReload(me.slots[me.sel]);
   if(e.code==='KeyE'&&state==='playing'){ const n=nearbyItems(); if(n.length) takeItem(n[0].it.id,true); }
+  if(e.code==='KeyH')startHeal();
   if(e.code==='KeyB')toggleBag(); });
 addEventListener('keyup', e=>{ keys[e.code]=false; });
 addEventListener('contextmenu', e=>e.preventDefault());
@@ -2498,7 +2587,8 @@ function loop(t){
       const c=WPN[me.slots[me.sel]].cls;
       adsMul = c==='snp'?0.3 : c==='ar'?0.55 : c==='smg'?0.8 : 0.7;
     }
-    const SP = (wading ? 3.8 : (dash ? 7.8 : 5.0))*(me.prone?0.35:1)*adsMul;
+    const healMul = me.healT>0 ? 0.4 : 1;
+    const SP = (wading ? 1.8 : (dash ? 4.2 : 2.4))*(me.prone?0.35:1)*adsMul*healMul;
     let nx=me.x+(-Math.sin(me.yaw)*f+Math.cos(me.yaw)*s)*SP*dt;
     let nz=me.z+(-Math.cos(me.yaw)*f-Math.sin(me.yaw)*s)*SP*dt;
     const rr=Math.hypot(nx,nz);
@@ -2523,7 +2613,33 @@ function loop(t){
     me.feetY=gh;
     const targetY=Math.max(gh, gh<WATER_Y?WATER_Y-0.5:gh)+(me.prone?0.5:EYE);
     me.eyeY += (targetY-me.eyeY)*Math.min(1,dt*14);
-    if(firing||keys['Space']||keys['KeyF']) fire();
+    const wantFire = firing||keys['Space']||keys['KeyF'];
+    if(me.sel>=2 && me.healT<=0){
+      // 投げ物: 押している間は軌道を表示、離すとその軌道どおりに投げる
+      const kind = me.sel===2?'nade':'smoke';
+      if(wantFire && bagCount(kind)>0 && me.cd<=0){
+        nadeAiming=true; updateTrajectory();
+      } else if(nadeAiming){
+        nadeAiming=false; hideTrajectory(); doThrow(); holdLock=true;
+      } else hideTrajectory();
+    } else {
+      if(nadeAiming){ nadeAiming=false; hideTrajectory(); }
+      if(wantFire && !holdLock) fire();
+    }
+    if(!wantFire) holdLock=false;
+    // 回復の進行
+    if(me.healT>0){
+      me.healT-=dt;
+      if(me.healT<=0){
+        me.healT=0;
+        bagConsume('heal',1);
+        me.hp=Math.min(100,me.hp+20);
+        send({t:'hit', hp:me.hp});
+        sfxHeal(); toast('回復した!HP+20');
+        updBars(); updBag();
+      }
+      updHealBtn();
+    }
     for(const it of items){
       if(it.active){
         it.obj.rotation.y+=dt*1.6;
@@ -2612,7 +2728,7 @@ function loop(t){
     fBase+Math.abs(Math.sin(ud.phase))*(ud.mixer?0.015:0.06)*ud.amp*(1-foe.pr)+(ud.mixer?0.08:0.22)*foe.pr, foe.z);
   foeMesh.rotation.y=foe.a+Math.PI+(ud.rel||0)*(1-foe.pr);
   foeMesh.rotation.z=Math.sin(ud.phase)*0.05*ud.amp*(1-foe.pr)-Math.sin(ud.rel||0)*0.08*ud.amp*(1-foe.pr);
-  foeMesh.rotation.x=-1.15*foe.pr;
+  foeMesh.rotation.x=-0.9*foe.pr;
   foeMesh.visible = training ? false : (foe.prot>0 ? ((t/140|0)%2===0) : true);
   if(training){
     for(const dm of dummies){
