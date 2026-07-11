@@ -166,7 +166,7 @@
 
 <div id="menuScreen" class="screen">
   <h1>ハムスター<span class="b">FPS</span><span class="p">アリーナ</span></h1>
-  <p class="sub">湖と森のフィールドでハムスターが1対1バトル。<br>近くのアイテムをタップして拾おう(武器・スコープ・回復など)。<br>相手を2回先に倒したら勝ち!風船10個ごとに強化ボーナス!</p>
+  <p class="sub">湖と森のフィールドでハムスターが1対1バトル。<br>近くのアイテムをタップして拾おう(武器・スコープ・回復など)。<br>相手を2回先に倒したら勝ち!風船10個ごとに強化ボーナス!<br>エイムアシスト&逆転ブーストつきで、はじめてでも楽しく戦える!</p>
   <button class="btn btn-blue" id="btnCreate">部屋を作る(きんくまチーム)</button>
   <button class="btn btn-pink" id="btnJoinMenu">部屋に入る(しろくまチーム)</button>
   <button class="btn btn-green" id="btnTrain">射撃訓練場(ひとりで練習)</button>
@@ -329,12 +329,12 @@ function lostConn(){ if(state==='dead')return; state='dead'; show('lostScreen');
 // ---------------- 定義 ----------------
 const PLAY_R=128, EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
 const WPN=[
-  {name:'G18',   cal:'9mm', cls:'pst', dmg:20, cd:0.42, spd:70,  col:0x9aa3b2, spread:0.008, ammo:36, mag:12, rel:1.1, recoil:0.025},
-  {name:'M416',  cal:'5mm', cls:'ar',  dmg:13, cd:0.14, spd:75,  col:0x5ad0a5, spread:0.018, ammo:60, mag:30, rel:1.6, recoil:0.013},
-  {name:'Kar98', cal:'7mm', cls:'snp', dmg:42, cd:0.9,  spd:120, col:0xf0a54a, spread:0.003, ammo:15, mag:5,  rel:2.0, recoil:0.06},
-  {name:'UMP',   cal:'9mm', cls:'smg', dmg:10, cd:0.11, spd:65,  col:0x5ab8d0, spread:0.022, ammo:75, mag:25, rel:1.4, recoil:0.011},
-  {name:'M16',   cal:'5mm', cls:'ar',  dmg:17, cd:0.19, spd:85,  col:0xd08a5a, spread:0.014, ammo:48, mag:20, rel:1.7, recoil:0.018},
-  {name:'AWM',   cal:'7mm', cls:'snp', dmg:55, cd:1.3,  spd:140, col:0xb78ae8, spread:0.002, ammo:9,  mag:3,  rel:2.4, recoil:0.08}
+  {name:'G18',   cal:'9mm', cls:'pst', dmg:20, cd:0.42, spd:70,  col:0x9aa3b2, spread:0.008, ammo:36, mag:12, rel:1.1, recoil:0.015},
+  {name:'M416',  cal:'5mm', cls:'ar',  dmg:13, cd:0.14, spd:75,  col:0x5ad0a5, spread:0.018, ammo:60, mag:30, rel:1.6, recoil:0.008},
+  {name:'Kar98', cal:'7mm', cls:'snp', dmg:42, cd:0.9,  spd:120, col:0xf0a54a, spread:0.003, ammo:15, mag:5,  rel:2.0, recoil:0.035},
+  {name:'UMP',   cal:'9mm', cls:'smg', dmg:10, cd:0.11, spd:65,  col:0x5ab8d0, spread:0.022, ammo:75, mag:25, rel:1.4, recoil:0.007},
+  {name:'M16',   cal:'5mm', cls:'ar',  dmg:17, cd:0.19, spd:85,  col:0xd08a5a, spread:0.014, ammo:48, mag:20, rel:1.7, recoil:0.011},
+  {name:'AWM',   cal:'7mm', cls:'snp', dmg:55, cd:1.3,  spd:140, col:0xb78ae8, spread:0.002, ammo:9,  mag:3,  rel:2.4, recoil:0.05}
 ];
 // スコープ対応: 2倍=SMG/AR/スナイパー, 4倍=AR/スナイパー, 8倍=スナイパーのみ
 function scopeFits(k,wid){
@@ -387,7 +387,7 @@ function bagConsume(k,n){
 const foe={x:24,z:24,tx:24,tz:24,a:0,ta:0,hp:100,prot:0,prone:false,pr:0,fy:0,tfy:0};
 let platforms=[], factorySite=null, mansionSite=null;
 let foeScore=0, projectiles=[], nadesArr=[], puffs=[], gunKick=0, hurtT=0, hitT=0, msgT=0;
-let pFoeX=null, pFoeZ=null, foeStepAcc=0, myStepAcc=0, bobPhase=0, walkAmp=0, adsT=0;
+let pFoeX=null, pFoeZ=null, foeStepAcc=0, myStepAcc=0, bobPhase=0, walkAmp=0, adsT=0, regenWait=0;
 let balloons=new Map(), balloonSeq=0, balloonTimer=0.5, myBalloons=0, foeBalloons=0, smokeClouds=[];
 let training=false, dummies=[], dmgNums=[];
 let deathFxs=[], victoryFx=null;
@@ -1873,7 +1873,7 @@ function onData(d){
     case 'hit': hitT=0.25; foe.hp=d.hp; updBars(); sfxHitm(); if(navigator.vibrate)navigator.vibrate(30); break;
     case 'died':
       spawnDeathFx(foe.x, foe.fy, foe.z, foe.a, isHost ? false : true);
-      me.score++; foe.hp=100; foe.prot=2;
+      me.score++; foe.hp=100; foe.prot=3;
       foe.x=foe.tx=d.x; foe.z=foe.tz=d.z;
       foe.fy=foe.tfy=groundY(d.x,d.z);
       setMsg('相手を倒した!'); sfxHitm(); sfxPick(); updBars(); updScore();
@@ -1962,9 +1962,12 @@ function respawnMe(){
   for(let i=0;i<4;i++){ const d=Math.hypot(SPAWNS[i][0]-foe.x,SPAWNS[i][1]-foe.z); if(d>bd){bd=d;best=i;} }
   const sp=safeSpot(SPAWNS[best][0],SPAWNS[best][1]);
   me.x=sp[0]; me.z=sp[1];
-  me.yaw=Math.atan2(me.x,me.z); me.hp=100; me.prot=2; me.cd=0;
+  me.yaw=Math.atan2(me.x,me.z); me.hp=100; me.prot=3; me.cd=0;
   me.healT=0; nadeAiming=false; hideTrajectory(); updHealBtn();
-  resetLoadout();
+  // やられても武器・アタッチメント・バッグはそのまま(マガジンだけ満タンに)
+  me.rld=null;
+  for(const wid of me.slots) if(wid!==null) me.mag[wid]=Math.max(me.mag[wid],WPN[wid].mag);
+  setZoom(false); setProne(false);
   me.feetY=groundY(me.x,me.z);
   me.eyeY=me.feetY+EYE;
   buildViewModel();
@@ -2308,6 +2311,22 @@ function explode(pos,mine){
   }
   if(navigator.vibrate && !mine) navigator.vibrate(60);
 }
+// エイムアシスト: 狙いが敵の近く(約5度以内)なら弾がゆるく吸い付く
+function applyAimAssist(dir){
+  const targets=[];
+  if(!training) targets.push({x:foe.x, y:foe.fy+(foe.prone?0.35:0.8), z:foe.z});
+  else for(const dm of dummies) if(dm.hp>0) targets.push({x:dm.x, y:groundY(dm.x,dm.z)+0.8, z:dm.z});
+  let best=null, bestA=0.09;
+  for(const tg of targets){
+    const to=new THREE.Vector3(tg.x-camera.position.x, tg.y-camera.position.y, tg.z-camera.position.z);
+    const d=to.length();
+    if(d<1.5 || d>80) continue;
+    to.normalize();
+    const a=dir.angleTo(to);
+    if(a<bestA){ bestA=a; best=to; }
+  }
+  if(best) dir.lerp(best,0.55).normalize();
+}
 let emptyToastT=0;
 function startReload(wi){
   if(me.rld!==null || me.healT>0 || me.stow) return;
@@ -2408,6 +2427,7 @@ function fire(){
   const spr=w.spread*(me.zoom?(zoomX()>=2?0.35:0.6):1);
   dir.x+=(Math.random()-0.5)*spr*2; dir.y+=(Math.random()-0.5)*spr*2; dir.z+=(Math.random()-0.5)*spr*2;
   dir.normalize();
+  applyAimAssist(dir);
   // 反動(ストック装着・匍匐・覗き込みで軽減)
   const rec=w.recoil*(wa.stk?0.45:1)*(me.prone?0.55:1)*(me.zoom?0.85:1);
   me.pitch=clamp(me.pitch+rec,-1.15,1.15);
@@ -2432,11 +2452,11 @@ function updateProjectiles(dt){
     pr.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), pr.v.clone().normalize());
     pr.life-=dt;
     let dead=false;
-    if(!pr.mine && segPointDist(ax,ay,az,bx,by,bz, me.x,myCy,me.z)<(me.prone?0.5:0.7)){
+    if(!pr.mine && segPointDist(ax,ay,az,bx,by,bz, me.x,myCy,me.z)<(me.prone?0.6:0.85)){
       dead=true; puff(pr.p,0xff6a5a,0.35);
       if(me.prot<=0) takeDamage(pr.dmg);
     }
-    if(!dead && pr.mine && !training && segPointDist(ax,ay,az,bx,by,bz, foe.x,fCy,foe.z)<(foe.prone?0.55:0.78)){
+    if(!dead && pr.mine && !training && segPointDist(ax,ay,az,bx,by,bz, foe.x,fCy,foe.z)<(foe.prone?0.65:0.92)){
       dead=true; puff(pr.p,0xffd0d0,0.3);
       showDamage(pr.p, pr.dmg);
     }
@@ -2506,7 +2526,10 @@ function updateProjectiles(dt){
   }
 }
 function takeDamage(dmg){
-  me.hp-=dmg; hurtT=0.4; sfxHurt(); updBars();
+  // 逆転ブースト: 負けている側は受けるダメージ30%減、勝っている側は25%増
+  if(me.score<foeScore) dmg=Math.max(1,Math.round(dmg*0.7));
+  else if(me.score>foeScore) dmg=Math.round(dmg*1.25);
+  me.hp-=dmg; regenWait=5; hurtT=0.4; sfxHurt(); updBars();
   if(navigator.vibrate) navigator.vibrate(80);
   if(me.hp<=0){
     respawnMe();
@@ -2514,8 +2537,9 @@ function takeDamage(dmg){
     setMsg('やられた…');
     foeScore++; updBars(); updScore();
     if(foeScore>=KILL_WIN) gameOver(false);
+    else if(foeScore>me.score) toast('🔥逆転ブースト発動!受けるダメージが減るよ');
   } else {
-    send({t:'hit', hp:me.hp});
+    send({t:'hit', hp:Math.round(me.hp)});
   }
 }
 
@@ -2694,7 +2718,7 @@ function updBars(){
   const r=Math.max(0,me.hp)/100, el=$('myHp');
   el.style.width=(r*100)+'%';
   el.style.background=r>0.6?'#639922':r>0.3?'#EF9F27':'#E24B4A';
-  $('hpLabel').textContent='あなた HP'+Math.max(0,me.hp)+(me.prot>0?'(保護中)':'')+(me.prone?'・匍匐中':'');
+  $('hpLabel').textContent='あなた HP'+Math.max(0,Math.round(me.hp))+(me.prot>0?'(保護中)':'')+(me.prone?'・匍匐中':'');
 }
 function updScore(){ $('score').textContent='🎈'+myBalloons+'-'+foeBalloons+'  💥'+me.score+'-'+foeScore; }
 function setMsg(s){ $('msg').textContent=s; msgT=1.8; }
@@ -2716,6 +2740,13 @@ function loop(t){
     me.rld=null; updSlots();
   }
   hurtT=Math.max(0,hurtT-dt); hitT=Math.max(0,hitT-dt); msgT=Math.max(0,msgT-dt);
+  // HP自動回復: ダメージを受けず5秒たつと毎秒5ずつ回復
+  regenWait=Math.max(0,regenWait-dt);
+  if(state==='playing' && regenWait<=0 && me.hp>0 && me.hp<100){
+    const prevHp=Math.round(me.hp);
+    me.hp=Math.min(100, me.hp+5*dt);
+    if(Math.round(me.hp)!==prevHp) updBars();
+  }
   gunKick=Math.max(0,gunKick-dt*7);
   muzzle.material.opacity=Math.max(0,muzzle.material.opacity-dt*14);
   $('dmgFlash').style.opacity=Math.min(1,hurtT*2.2);
