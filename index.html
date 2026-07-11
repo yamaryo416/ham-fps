@@ -33,7 +33,7 @@
   .setLbl { font-size:13px; color:#c8cdd8; font-weight:700; margin-bottom:6px; display:flex; justify-content:space-between; }
   .setLbl span { color:#ffd166; }
   .setRow input[type=range] { width:100%; accent-color:#5aa5e8; height:28px; }
-  #relFireBtn.on { border-color:#5ad0a5; color:#8ae8c0; }
+  #relFireBtn.on, #autoFireBtn.on { border-color:#5ad0a5; color:#8ae8c0; }
   #codeInput { font-family:inherit; font-size:30px; font-weight:700; letter-spacing:0.4em; text-align:center;
     width:min(240px,70vw); padding:12px; border-radius:14px; border:1.5px solid #3a3f4e; background:#1d2029; color:#fff; outline:none; }
   #codeInput:focus { border-color:#5aa5e8; }
@@ -93,6 +93,14 @@
     width:44px; height:44px; border-radius:50%; background:rgba(99,153,34,0.22); border:2px solid rgba(140,190,80,0.6);
     color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:10px; z-index:21; touch-action:none; }
   #proneBtn.on { background:rgba(99,153,34,0.65); }
+  #ballBtn { position:absolute; left:calc(50% + 90px + 56px); bottom:calc(6px + env(safe-area-inset-bottom));
+    width:48px; height:48px; border-radius:50%; background:rgba(255,170,60,0.15); border:2px solid rgba(255,190,90,0.65);
+    color:rgba(255,255,255,0.95); font-family:inherit; font-weight:700; font-size:9px; line-height:1.25; z-index:21; touch-action:none; }
+  #ballBtn.on { border-color:#ffd166; box-shadow:0 0 14px rgba(255,190,90,0.85); }
+  #cross.lock::before, #cross.lock::after { background:#ff5a4a; }
+  #cross.lock { transform:translate(-50%,-50%) scale(1.3); }
+  #ballOv { display:none; position:absolute; inset:0; z-index:9; pointer-events:none;
+    background:radial-gradient(circle at center, transparent 42%, rgba(140,200,255,0.16) 72%, rgba(100,170,240,0.38) 100%); }
   #scopeOv { display:none; position:absolute; inset:0; z-index:9; pointer-events:none;
     background:radial-gradient(circle at center, transparent 30%, rgba(5,8,12,0.92) 42%); }
   #bagPanel { display:none; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -160,18 +168,40 @@
     align-items:center; justify-content:center; gap:20px; z-index:40; }
   #overTitle { font-size:32px; font-weight:700; }
   @media (prefers-reduced-motion: reduce) { .pulse { animation:none; } }
+  /* ---- 縦画面レイアウト: 両親指の届く位置にボタンを再配置 ---- */
+  @media (orientation: portrait) {
+    #fireBtn { width:96px; height:96px; font-size:17px;
+      right:calc(16px + env(safe-area-inset-right)); bottom:calc(235px + env(safe-area-inset-bottom)); }
+    #adsBtn { left:auto; top:auto; right:calc(30px + env(safe-area-inset-right));
+      bottom:calc(345px + env(safe-area-inset-bottom)); }
+    #fireBtn2 { left:calc(16px + env(safe-area-inset-left)); top:auto;
+      bottom:calc(235px + env(safe-area-inset-bottom)); width:72px; height:72px; }
+    #ballBtn { left:auto; right:calc(36px + env(safe-area-inset-right));
+      bottom:calc(163px + env(safe-area-inset-bottom)); width:56px; height:56px; font-size:10px; }
+    #proneBtn { left:calc(24px + env(safe-area-inset-left)); bottom:calc(163px + env(safe-area-inset-bottom));
+      width:52px; height:52px; }
+    #bagBtn { left:calc(24px + env(safe-area-inset-left)); bottom:calc(345px + env(safe-area-inset-bottom));
+      width:52px; height:52px; }
+    #slots { bottom:calc(96px + env(safe-area-inset-bottom)); }
+    #throwBtn { bottom:calc(96px + env(safe-area-inset-bottom)); }
+    #healBtn { bottom:calc(96px + env(safe-area-inset-bottom)); }
+    #hpBar { bottom:calc(58px + env(safe-area-inset-bottom)); }
+    #moveHint { bottom:calc(440px + env(safe-area-inset-bottom)); left:calc(20px + env(safe-area-inset-left)); }
+    #aimHint { bottom:calc(440px + env(safe-area-inset-bottom)); right:calc(20px + env(safe-area-inset-right)); }
+    #toast { bottom:190px; }
+  }
 </style>
 </head>
 <body>
 
 <div id="menuScreen" class="screen">
   <h1>ハムスター<span class="b">FPS</span><span class="p">アリーナ</span></h1>
-  <p class="sub">湖と森のフィールドでハムスターが1対1バトル。<br>近くのアイテムをタップして拾おう(武器・スコープ・回復など)。<br>相手を2回先に倒したら勝ち!風船10個ごとに強化ボーナス!<br>エイムアシスト&逆転ブーストつきで、はじめてでも楽しく戦える!</p>
+  <p class="sub">湖と森のフィールドでハムスターが1対1バトル。<br>近くのアイテムをタップして拾おう(武器・スコープ・回復など)。<br>相手を2回先に倒したら勝ち!🐹ボールに変身して体当たりもできる!<br>照準が敵に合うと自動発射(オートショット)だから、はじめてでも戦える!</p>
   <button class="btn btn-blue" id="btnCreate">部屋を作る(きんくまチーム)</button>
   <button class="btn btn-pink" id="btnJoinMenu">部屋に入る(しろくまチーム)</button>
   <button class="btn btn-green" id="btnTrain">射撃訓練場(ひとりで練習)</button>
   <button class="btn btn-ghost" id="btnSettings">⚙ 設定</button>
-  <p class="sub">スマホは横向き推奨 / パソコンはWASD+マウス+1〜4キー<br>Q=のぞく / C=匍匐 / B=バッグ / H=回復</p>
+  <p class="sub">スマホはたて持ちでもよこ持ちでもOK / パソコンはWASD+マウス<br>Q=のぞく / C=匍匐 / B=バッグ / H=回復 / G=ボール</p>
 </div>
 
 <div id="setScreen" class="screen hidden">
@@ -187,6 +217,10 @@
   <div class="setRow">
     <div class="setLbl">視点スティックを離したら発射</div>
     <button class="btn btn-ghost" id="relFireBtn" style="width:100%;">ON</button>
+  </div>
+  <div class="setRow">
+    <div class="setLbl">オートショット(照準が敵に合うと自動発射)</div>
+    <button class="btn btn-ghost" id="autoFireBtn" style="width:100%;">ON</button>
   </div>
   <button class="btn btn-blue" id="btnSetBack">もどる</button>
 </div>
@@ -227,10 +261,12 @@
   <div id="aimBase"></div><div id="aimKnob"></div>
   <div id="moveHint">画面の左側をタッチ→いどう</div>
   <div id="aimHint">画面の右側をタッチ→しせん</div>
+  <div id="ballOv"></div>
   <button id="adsBtn">のぞく</button>
   <button id="fireBtn2">うつ</button>
   <button id="bagBtn">バッグ</button>
   <button id="proneBtn">匍匐</button>
+  <button id="ballBtn">🐹<br>ボール</button>
   <button id="exitBtn">訓練を終わる</button>
   <button id="fireBtn">うつ</button>
   <div id="slots">
@@ -292,12 +328,13 @@ function makeHostPeer(){
 $('btnJoinMenu').onclick = ()=>{ isHost=false; show('joinScreen'); setTimeout(()=>$('codeInput').focus(),100); };
 
 // ---------------- 設定(localStorageに保存) ----------------
-const SETTINGS={sens:1.0, adsSens:1.0, relFire:true};
+const SETTINGS={sens:1.0, adsSens:1.0, relFire:true, autoFire:true};
 try{
   const sv=JSON.parse(localStorage.getItem('hamfps_settings')||'{}');
   if(typeof sv.sens==='number') SETTINGS.sens=clamp(sv.sens,0.3,2.2);
   if(typeof sv.adsSens==='number') SETTINGS.adsSens=clamp(sv.adsSens,0.3,2.2);
   if(typeof sv.relFire==='boolean') SETTINGS.relFire=sv.relFire;
+  if(typeof sv.autoFire==='boolean') SETTINGS.autoFire=sv.autoFire;
 }catch(e){}
 function saveSettings(){ try{ localStorage.setItem('hamfps_settings', JSON.stringify(SETTINGS)); }catch(e){} }
 function refreshSettingsUI(){
@@ -307,12 +344,15 @@ function refreshSettingsUI(){
   $('adsSensVal').textContent=Math.round(SETTINGS.adsSens*100)+'%';
   $('relFireBtn').textContent=SETTINGS.relFire?'ON':'OFF';
   $('relFireBtn').classList.toggle('on',SETTINGS.relFire);
+  $('autoFireBtn').textContent=SETTINGS.autoFire?'ON':'OFF';
+  $('autoFireBtn').classList.toggle('on',SETTINGS.autoFire);
 }
 $('btnSettings').onclick=()=>{ refreshSettingsUI(); show('setScreen'); };
 $('btnSetBack').onclick=()=>show('menuScreen');
 $('sensSlider').addEventListener('input', e=>{ SETTINGS.sens=(+e.target.value)/100; $('sensVal').textContent=e.target.value+'%'; saveSettings(); });
 $('adsSensSlider').addEventListener('input', e=>{ SETTINGS.adsSens=(+e.target.value)/100; $('adsSensVal').textContent=e.target.value+'%'; saveSettings(); });
 $('relFireBtn').onclick=()=>{ SETTINGS.relFire=!SETTINGS.relFire; refreshSettingsUI(); saveSettings(); };
+$('autoFireBtn').onclick=()=>{ SETTINGS.autoFire=!SETTINGS.autoFire; refreshSettingsUI(); saveSettings(); };
 $('btnTrain').onclick = ()=>{ isHost=true; training=true; seed=(Math.random()*1e9)|0; audioInit(); startGame(); };
 $('exitBtn').onclick = ()=>location.reload();
 $('btnJoin').onclick = ()=>{
@@ -355,7 +395,7 @@ const SPAWNS=[[-65,-65],[65,-65],[-65,65],[65,65]];
 let heightFn=null, obstacles=[], items=[];
 let scene,camera,renderer,foeMesh,gunGroup,muzzle,waterMesh;
 const me={x:-24,z:-24,yaw:0,pitch:0,hp:100,score:0,cd:0,prot:0,slots:[0,null],sel:0,
-  ammo:{}, mag:{}, rld:null,feetY:0,eyeY:0,zoom:false,prone:false,healT:0,stow:false,
+  ammo:{}, mag:{}, rld:null,feetY:0,eyeY:0,zoom:false,prone:false,healT:0,stow:false,ball:false,ballE:1,
   bag:[],
   watt:{0:{scope:null,noz:false,stk:false},1:{scope:null,noz:false,stk:false}}};
 // バッグ(8スロット・スタック制)
@@ -384,13 +424,14 @@ function bagConsume(k,n){
   }
   return n-left;
 }
-const foe={x:24,z:24,tx:24,tz:24,a:0,ta:0,hp:100,prot:0,prone:false,pr:0,fy:0,tfy:0};
+const foe={x:24,z:24,tx:24,tz:24,a:0,ta:0,hp:100,prot:0,prone:false,pr:0,fy:0,tfy:0,ball:false};
 let platforms=[], factorySite=null, mansionSite=null;
 let foeScore=0, projectiles=[], nadesArr=[], puffs=[], gunKick=0, hurtT=0, hitT=0, msgT=0;
 let pFoeX=null, pFoeZ=null, foeStepAcc=0, myStepAcc=0, bobPhase=0, walkAmp=0, adsT=0, regenWait=0;
 let balloons=new Map(), balloonSeq=0, balloonTimer=0.5, myBalloons=0, foeBalloons=0, smokeClouds=[];
 let training=false, dummies=[], dmgNums=[];
 let deathFxs=[], victoryFx=null;
+let foeBall=null, ramCd=0, kbX=0, kbZ=0, lockPrev=false, lastBallP=-1;
 
 // ---------------- 質感テクスチャ ----------------
 let _groundTex=null, _furTex=null, _barkTex=null;
@@ -1207,6 +1248,11 @@ function buildWorld(rng){
 
   foeMesh=hamModel(!isHost);
   scene.add(foeMesh);
+  // 相手のハムスターボール(透明な球)
+  foeBall=new THREE.Mesh(new THREE.SphereGeometry(0.95,16,12),
+    new THREE.MeshLambertMaterial({color:0x9ad4ff, transparent:true, opacity:0.3, depthWrite:false}));
+  foeBall.visible=false;
+  scene.add(foeBall);
   gunGroup=new THREE.Group();
   camera.add(gunGroup); scene.add(camera);
   muzzle=new THREE.Mesh(new THREE.SphereGeometry(0.09,8,6),
@@ -1550,7 +1596,7 @@ function zoomX(){
   return sc || 1.35;
 }
 function setZoom(z){
-  if(z && (zoomX()===1 || me.healT>0)) z=false;
+  if(z && (zoomX()===1 || me.healT>0 || me.ball)) z=false;
   me.zoom=z;
   const btn=$('adsBtn');
   if(btn){ btn.classList.toggle('on',me.zoom); btn.textContent=me.zoom?'もどす':'のぞく'; }
@@ -1645,6 +1691,7 @@ $('adsBtn').addEventListener('mousedown',  e=>{ e.stopPropagation(); setZoom(!me
 
 // ---------------- 匍匐 ----------------
 function setProne(p){
+  if(p && me.ball) return; // ボール中は匍匐できない
   me.prone=p;
   $('proneBtn').classList.toggle('on',p);
   updBars();
@@ -1652,6 +1699,37 @@ function setProne(p){
 }
 $('proneBtn').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); setProne(!me.prone); },{passive:false});
 $('proneBtn').addEventListener('mousedown',  e=>{ e.stopPropagation(); setProne(!me.prone); });
+
+// ---------------- ハムスターボール ----------------
+// ボールに変身して転がる: 高速移動+体当たり攻撃。撃てないが受けるダメージ半減。
+function updBallBtn(){
+  const b=$('ballBtn'), p=Math.round(me.ballE*100);
+  b.innerHTML = me.ball ? 'もどる' : '🐹<br>ボール';
+  b.style.background='linear-gradient(to top, rgba(255,170,60,0.5) '+p+'%, rgba(255,170,60,0.08) '+p+'%)';
+}
+function setBall(on){
+  if(on===me.ball) return;
+  if(on){
+    if(state!=='playing') return;
+    if(me.healT>0){ toast('回復中はボールになれない'); return; }
+    if(me.ballE<0.25){ toast('ボールのパワーがまだたまっていない!'); sfxEmpty(); return; }
+    setZoom(false); setProne(false);
+    if(me.rld!==null){ me.rld=null; me.cd=Math.min(me.cd,0.2); }
+    nadeAiming=false; hideTrajectory();
+    toast('🐹ハムスターボール!走って体当たりでダメージ!');
+  }
+  me.ball=on;
+  $('ballBtn').classList.toggle('on',on);
+  $('ballOv').style.display=on?'block':'none';
+  if(gunGroup) gunGroup.visible=!on;
+  sfxBall(on);
+  updBallBtn(); updBars();
+  if(navigator.vibrate) navigator.vibrate(15);
+}
+function sfxBall(on){ if(!audioInit())return; tone({f:on?300:620,f2:on?620:300,dur:0.18,vol:0.25,type:'sine'}); }
+function sfxRam(vol){ if(!audioInit())return; burst({dur:0.25,vol:0.7*vol,f:300}); tone({f:180,f2:55,dur:0.3,vol:0.5*vol,type:'triangle'}); }
+$('ballBtn').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); setBall(!me.ball); },{passive:false});
+$('ballBtn').addEventListener('mousedown',  e=>{ e.stopPropagation(); setBall(!me.ball); });
 
 // ---------------- 回復キット使用 ----------------
 const HEAL_TIME=5;
@@ -1669,6 +1747,7 @@ function updHealBtn(){
 }
 function startHeal(){
   if(state!=='playing' || me.healT>0) return;
+  if(me.ball){ toast('ボール中は回復できない'); return; }
   if(bagCount('heal')<=0){ toast('回復キットを持っていない'); return; }
   if(me.hp>=100){ toast('HPは満タン!'); return; }
   me.healT=HEAL_TIME;
@@ -1863,7 +1942,7 @@ function updatePickChips(){
 function onData(d){
   switch(d.t){
     case 'init': seed=d.seed; startGame(); break;
-    case 'pos': foe.tx=d.x; foe.tz=d.z; foe.ta=d.a; foe.prone=!!d.p;
+    case 'pos': foe.tx=d.x; foe.tz=d.z; foe.ta=d.a; foe.prone=!!d.p; foe.ball=!!d.b;
       foe.tfy=(typeof d.y==='number')?d.y:groundY(d.x,d.z); break;
     case 'shot': spawnProjectile(new THREE.Vector3(d.x,d.y,d.z), new THREE.Vector3(d.dx,d.dy,d.dz), d.w, false); sfxShot(d.w, volAt(d.x,d.z,50)*0.85); break;
     case 'nade': spawnNade(new THREE.Vector3(d.x,d.y,d.z), new THREE.Vector3(d.dx,d.dy,d.dz), false, false); sfxThrow(); break;
@@ -1902,9 +1981,8 @@ function startGame(){
     setMsg('射撃訓練場へようこそ!風船やまとを撃とう');
   }
   try{ document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }catch(e){}
-  try{ screen.orientation && screen.orientation.lock('landscape').catch(()=>{}); }catch(e){}
   addEventListener('resize', onResize);
-  setInterval(()=>{ if(state==='playing') send({t:'pos',x:me.x,z:me.z,a:me.yaw,p:me.prone?1:0,y:me.feetY}); },50);
+  setInterval(()=>{ if(state==='playing') send({t:'pos',x:me.x,z:me.z,a:me.yaw,p:me.prone?1:0,y:me.feetY,b:me.ball?1:0}); },50);
   last=performance.now();
   requestAnimationFrame(loop);
 }
@@ -1953,6 +2031,7 @@ function doReset(){
   for(const n of nadesArr) scene.remove(n.mesh);
   projectiles=[]; nadesArr=[];
   me.healT=0; nadeAiming=false; hideTrajectory();
+  setBall(false); me.ballE=1; kbX=0; kbZ=0; ramCd=0; lastBallP=-1; updBallBtn();
   buildViewModel(); updBars(); updScore(); setMsg('');
   $('overlay').style.display='none';
   state='playing';
@@ -1964,6 +2043,7 @@ function respawnMe(){
   me.x=sp[0]; me.z=sp[1];
   me.yaw=Math.atan2(me.x,me.z); me.hp=100; me.prot=3; me.cd=0;
   me.healT=0; nadeAiming=false; hideTrajectory(); updHealBtn();
+  setBall(false); me.ballE=1; kbX=0; kbZ=0; updBallBtn();
   // やられても武器・アタッチメント・バッグはそのまま(マガジンだけ満タンに)
   me.rld=null;
   for(const wid of me.slots) if(wid!==null) me.mag[wid]=Math.max(me.mag[wid],WPN[wid].mag);
@@ -2327,9 +2407,44 @@ function applyAimAssist(dir){
   }
   if(best) dir.lerp(best,0.55).normalize();
 }
+// オートショット用: 照準の先(約3度以内・視線が通っている)に敵がいるか
+function losClear(x0,y0,z0,x1,y1,z1,d){
+  const n=Math.max(2,Math.ceil(d/2));
+  let py0=y0;
+  for(let i=1;i<n;i++){
+    const t=i/n, sx=x0+(x1-x0)*t, sy=y0+(y1-y0)*t, sz=z0+(z1-z0)*t;
+    if(groundY(sx,sz)>sy) return false;
+    for(const o of obstacles){ if(sy<o.top && Math.hypot(sx-o.x,sz-o.z)<o.rr) return false; }
+    for(const p of platforms){
+      if(sx>=p.x0&&sx<=p.x1&&sz>=p.z0&&sz<=p.z1){
+        const py=platY(p,sx,sz);
+        if((py0>py)!==(sy>py)) return false;
+      }
+    }
+    py0=sy;
+  }
+  return true;
+}
+function autoTargetVec(){
+  const cp=Math.cos(me.pitch);
+  const fx=-Math.sin(me.yaw)*cp, fy=Math.sin(me.pitch), fz=-Math.cos(me.yaw)*cp;
+  const cands=[];
+  if(!training){
+    if(!foeMesh || !foeMesh.visible || foe.prot>0) return null;
+    cands.push({x:foe.x, y:foe.fy+(foe.prone?0.35:0.8), z:foe.z});
+  } else for(const dm of dummies) if(dm.hp>0) cands.push({x:dm.x, y:groundY(dm.x,dm.z)+0.8, z:dm.z});
+  for(const c of cands){
+    const dx=c.x-me.x, dy=c.y-me.eyeY, dz=c.z-me.z;
+    const d=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    if(d<1.5 || d>60) continue;
+    if((dx*fx+dy*fy+dz*fz)/d < 0.9985) continue; // 約3.1度のコーン
+    if(losClear(me.x,me.eyeY,me.z, c.x,c.y,c.z, d)) return c;
+  }
+  return null;
+}
 let emptyToastT=0;
 function startReload(wi){
-  if(me.rld!==null || me.healT>0 || me.stow) return;
+  if(me.rld!==null || me.healT>0 || me.stow || me.ball) return;
   if(me.mag[wi]>=WPN[wi].mag || me.ammo[wi]<=0) return;
   me.rld=wi;
   me.cd=Math.max(me.cd, WPN[wi].rel);
@@ -2401,7 +2516,7 @@ function doThrow(){
   if(navigator.vibrate) navigator.vibrate(15);
 }
 function fire(){
-  if(me.healT>0) return; // 回復中は撃てない
+  if(me.healT>0 || me.ball) return; // 回復中・ボール中は撃てない
   if(me.stow && me.sel<2){
     const now=performance.now();
     if(now-emptyToastT>1500){ emptyToastT=now; toast('武器を収納中!スロットをタップして取り出そう'); }
@@ -2526,6 +2641,7 @@ function updateProjectiles(dt){
   }
 }
 function takeDamage(dmg){
+  if(me.ball) dmg=Math.round(dmg*0.5); // ボールは守りもかたい
   // 逆転ブースト: 負けている側は受けるダメージ30%減、勝っている側は25%増
   if(me.score<foeScore) dmg=Math.max(1,Math.round(dmg*0.7));
   else if(me.score>foeScore) dmg=Math.round(dmg*1.25);
@@ -2696,6 +2812,7 @@ addEventListener('keydown', e=>{ keys[e.code]=true;
   if(e.code==='KeyR'&&me.sel<2&&me.slots[me.sel]!==null)startReload(me.slots[me.sel]);
   if(e.code==='KeyE'&&state==='playing'){ const n=nearbyItems(); if(n.length) takeItem(n[0].it.id,true); }
   if(e.code==='KeyH')startHeal();
+  if(e.code==='KeyG')setBall(!me.ball);
   if(e.code==='KeyB')toggleBag(); });
 addEventListener('keyup', e=>{ keys[e.code]=false; });
 addEventListener('contextmenu', e=>e.preventDefault());
@@ -2718,7 +2835,7 @@ function updBars(){
   const r=Math.max(0,me.hp)/100, el=$('myHp');
   el.style.width=(r*100)+'%';
   el.style.background=r>0.6?'#639922':r>0.3?'#EF9F27':'#E24B4A';
-  $('hpLabel').textContent='あなた HP'+Math.max(0,Math.round(me.hp))+(me.prot>0?'(保護中)':'')+(me.prone?'・匍匐中':'');
+  $('hpLabel').textContent='あなた HP'+Math.max(0,Math.round(me.hp))+(me.prot>0?'(保護中)':'')+(me.prone?'・匍匐中':'')+(me.ball?'・🐹ボール!':'');
 }
 function updScore(){ $('score').textContent='🎈'+myBalloons+'-'+foeBalloons+'  💥'+me.score+'-'+foeScore; }
 function setMsg(s){ $('msg').textContent=s; msgT=1.8; }
@@ -2782,9 +2899,14 @@ function loop(t){
     }
     const healMul = me.healT>0 ? 0.4 : 1;
     const stowMul = (me.stow && me.sel<2) ? 1.25 : 1; // 素手なら少し速い
-    const SP = (wading ? 1.8 : (dash ? 4.2 : 2.4))*(me.prone?0.35:1)*adsMul*healMul*stowMul;
+    // ボール中はいつでも高速で転がれる
+    const SP = me.ball ? (wading ? 3.4 : 6.2)
+             : (wading ? 1.8 : (dash ? 4.2 : 2.4))*(me.prone?0.35:1)*adsMul*healMul*stowMul;
     let nx=me.x+(-Math.sin(me.yaw)*f+Math.cos(me.yaw)*s)*SP*dt;
     let nz=me.z+(-Math.cos(me.yaw)*f-Math.sin(me.yaw)*s)*SP*dt;
+    // 体当たりのノックバック
+    nx+=kbX*dt; nz+=kbZ*dt;
+    kbX*=Math.max(0,1-dt*4); kbZ*=Math.max(0,1-dt*4);
     const rr=Math.hypot(nx,nz);
     if(rr>PLAY_R){ nx*=PLAY_R/rr; nz*=PLAY_R/rr; }
     if(groundY(nx,nz) < -3.1){
@@ -2805,12 +2927,12 @@ function loop(t){
     if(myStepAcc>2.0){ myStepAcc=0; sfxStep(me.prone?0.2:0.5, wading); }
     const gh=floorAt(me.x,me.z, me.feetY);
     me.feetY=gh;
-    const targetY=Math.max(gh, gh<WATER_Y?WATER_Y-0.5:gh)+(me.prone?0.5:EYE);
+    const targetY=Math.max(gh, gh<WATER_Y?WATER_Y-0.5:gh)+(me.ball?0.85:me.prone?0.5:EYE);
     me.eyeY += (targetY-me.eyeY)*Math.min(1,dt*14);
     const wantFire = firing||keys['Space']||keys['KeyF'];
     // 投げ物は「うつ」長押しでも、右画面タッチ(視点スティック)でも狙える
     const nadeHold = wantFire || aim.id!==-1;
-    if(me.sel>=2 && me.healT<=0){
+    if(me.sel>=2 && me.healT<=0 && !me.ball){
       // 投げ物: 押している間は軌道を表示、離すとその軌道どおりに投げる
       const kind = me.sel===2?'nade':'smoke';
       if(nadeHold && bagCount(kind)>0 && me.cd<=0){
@@ -2823,6 +2945,34 @@ function loop(t){
       if(wantFire && !holdLock) fire();
     }
     if(!wantFire) holdLock=false;
+    // ハムスターボール: パワーの消費と回復
+    if(me.ball){
+      me.ballE-=dt/5.5;
+      if(me.ballE<=0){ me.ballE=0; setBall(false); toast('パワー切れ!ボール解除'); }
+    } else me.ballE=Math.min(1, me.ballE+dt/8);
+    const bp=Math.round(me.ballE*20);
+    if(bp!==lastBallP){ lastBallP=bp; updBallBtn(); }
+    // 訓練場: ボールでまとに体当たり
+    if(training && me.ball && ramCd<=0 && mMove/Math.max(dt,0.001)>3.2){
+      for(const dm of dummies){
+        if(dm.hp<=0) continue;
+        if(Math.hypot(me.x-dm.x, me.z-dm.z)<1.5){
+          ramCd=0.7; sfxRam(0.8);
+          kbX=(me.x-dm.x)*4; kbZ=(me.z-dm.z)*4;
+          hitDummy(dm,30,new THREE.Vector3(dm.x,groundY(dm.x,dm.z)+1.2,dm.z));
+          break;
+        }
+      }
+    }
+    // オートショット & 照準ロック表示
+    let lockOn=false;
+    if(me.sel<2 && !me.stow && !me.ball && me.healT<=0 && me.slots[me.sel]!==null
+       && $('bagPanel').style.display!=='flex'){
+      const tgt=autoTargetVec();
+      lockOn=!!tgt;
+      if(lockOn && SETTINGS.autoFire && me.cd<=0 && me.rld===null && me.mag[me.slots[me.sel]]>0) fire();
+    }
+    if(lockOn!==lockPrev){ lockPrev=lockOn; $('cross').classList.toggle('lock',lockOn); }
     // 回復の進行
     if(me.healT>0){
       me.healT-=dt;
@@ -2844,9 +2994,9 @@ function loop(t){
     }
   }
 
-  camera.position.set(me.x, me.eyeY+Math.abs(Math.sin(bobPhase))*0.05*walkAmp*(me.prone?0.35:1), me.z);
+  camera.position.set(me.x, me.eyeY+Math.abs(Math.sin(bobPhase))*0.05*walkAmp*(me.prone?0.35:me.ball?1.7:1), me.z);
   camera.rotation.set(me.pitch, me.yaw, 0);
-  const fovT = me.zoom ? 72/zoomX() : 72;
+  const fovT = me.zoom ? 72/zoomX() : (me.ball?84:72);
   if(Math.abs(camera.fov-fovT)>0.05){
     camera.fov+=(fovT-camera.fov)*Math.min(1,dt*12);
     camera.updateProjectionMatrix();
@@ -2927,6 +3077,27 @@ function loop(t){
   foeMesh.rotation.z=Math.sin(ud.phase)*0.05*ud.amp*(1-foe.pr)-Math.sin(ud.rel||0)*0.08*ud.amp*(1-foe.pr);
   foeMesh.rotation.x=-0.9*foe.pr;
   foeMesh.visible = training ? false : (foe.prot>0 ? ((t/140|0)%2===0) : true);
+  // 相手のハムスターボール表示(中でハムスターがくるくる回る)
+  if(foe.ball){
+    ud.roll=(ud.roll||0)+fsp*dt/0.9;
+    foeMesh.rotation.x=ud.roll; foeMesh.rotation.z=0;
+  } else if(ud.roll){ ud.roll=0; }
+  if(foeBall){
+    foeBall.visible = !training && foe.ball && foeMesh.visible;
+    foeBall.position.set(foe.x, fBase+0.92, foe.z);
+  }
+  // ボールの体当たりを受けたか(自分の画面で判定)
+  ramCd=Math.max(0,ramCd-dt);
+  if(state==='playing' && !training && foe.ball && me.prot<=0 && ramCd<=0){
+    const rd=Math.hypot(foe.x-me.x, foe.z-me.z);
+    if(rd<1.5 && fsp>3.2 && Math.abs(foe.fy-me.feetY)<1.8){
+      ramCd=1.0;
+      const inv=1/Math.max(rd,0.001);
+      kbX=(me.x-foe.x)*inv*10; kbZ=(me.z-foe.z)*inv*10;
+      sfxRam(1); setMsg('🐹体当たりされた!');
+      takeDamage(30);
+    }
+  }
   if(training){
     for(const dm of dummies){
       if(dm.dying!==undefined && dm.dying>0){
