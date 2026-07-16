@@ -195,6 +195,7 @@
 <div id="menuScreen" class="screen">
   <h1>ハムスター<span class="b">FPS</span><span class="p">アリーナ</span></h1>
   <p class="sub">湖と森のフィールドでハムスターが1対1バトル。<br>近くのアイテムをタップして拾おう(武器・スコープ・回復など)。<br>相手を2回先に倒したら勝ち!🐹ボールに変身して体当たりもできる!<br>スマホは親指1本でOK(おやゆびモード)— ねらい・発射・アイテム回収は自動!<br>武器にはスコープ内蔵。予備弾はバッグで持ち運ぼう(タップで捨てられる)</p>
+  <button class="btn btn-ghost" id="mapBtn">マップ: 🌲そうげんフィールド</button>
   <button class="btn btn-blue" id="btnCreate">部屋を作る(きんくまチーム)</button>
   <button class="btn btn-pink" id="btnJoinMenu">部屋に入る(しろくまチーム)</button>
   <button class="btn btn-green" id="btnTrain">射撃訓練場(ひとりで練習)</button>
@@ -325,7 +326,7 @@ function makeHostPeer(){
   peer.on('error', e=>{ if(e.type==='unavailable-id'){ peer.destroy(); makeHostPeer(); } });
   peer.on('connection', c=>{
     conn=c;
-    conn.on('open', ()=>{ seed=(Math.random()*1e9)|0; send({t:'init',seed}); wire(); startGame(); });
+    conn.on('open', ()=>{ seed=(Math.random()*1e9)|0; send({t:'init',seed,map:mapSel}); wire(); startGame(); });
   });
 }
 $('btnJoinMenu').onclick = ()=>{ isHost=false; show('joinScreen'); setTimeout(()=>$('codeInput').focus(),100); };
@@ -361,6 +362,13 @@ $('adsSensSlider').addEventListener('input', e=>{ SETTINGS.adsSens=(+e.target.va
 $('relFireBtn').onclick=()=>{ SETTINGS.relFire=!SETTINGS.relFire; refreshSettingsUI(); saveSettings(); };
 $('autoFireBtn').onclick=()=>{ SETTINGS.autoFire=!SETTINGS.autoFire; refreshSettingsUI(); saveSettings(); };
 $('thumbBtn').onclick=()=>{ SETTINGS.thumb=!SETTINGS.thumb; refreshSettingsUI(); saveSettings(); applyThumbUI(); };
+// ---------------- マップ選択(部屋を作る側/訓練場で有効) ----------------
+let mapSel=0;
+try{ mapSel=(+localStorage.getItem('hamfps_map'))||0; }catch(e){}
+if(mapSel!==0 && mapSel!==1) mapSel=0;
+function updMapBtn(){ $('mapBtn').textContent='マップ: '+(mapSel===1?'🏢しつないアリーナ':'🌲そうげんフィールド'); }
+$('mapBtn').onclick=()=>{ mapSel=mapSel===1?0:1; updMapBtn(); try{ localStorage.setItem('hamfps_map',mapSel); }catch(e){} };
+updMapBtn();
 // おやゆびモード: HUDの出しわけとヒント文言
 function applyThumbUI(){
   $('gameWrap').classList.toggle('thumbUI', SETTINGS.thumb);
@@ -380,7 +388,8 @@ function wire(){ conn.on('data',onData); conn.on('close',lostConn); conn.on('err
 function lostConn(){ if(state==='dead')return; state='dead'; show('lostScreen'); $('gameWrap').style.display='none'; }
 
 // ---------------- 定義 ----------------
-const PLAY_R=78, EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
+let PLAY_R=78; // マップにより変わる
+const EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
 // AR/SMGは高連射・低威力、スナイパーは単発・高威力。スコープは最初から内蔵(zoom)
 const WPN=[
   {name:'G18',   cal:'9mm', cls:'pst', dmg:16, cd:0.3,   spd:70,  col:0x9aa3b2, spread:0.014, ammo:45, mag:15, rel:1.0, recoil:0.012, zoom:1.35, life:1.1},
@@ -397,7 +406,7 @@ const STACK_CAP={ammo5:60,ammo7:60,ammo9:60,nade:2,smoke:2,heal:4};
 const BAG_SLOTS=8;
 const NADE_COL=0xe24b4a, AMMO_COL=0xffd166, NADE_MAX=4, SMOKE_MAX=2;
 const BALLOON_COLS=[0xe84b4a,0xffd166,0x5ad0a5,0x5aa5e8,0xf096b4,0xb78ae8];
-const SPAWNS=[[-42,-42],[42,-42],[-42,42],[42,42]];
+let SPAWNS=[[-42,-42],[42,-42],[-42,42],[42,42]];
 let heightFn=null, obstacles=[], items=[];
 let scene,camera,renderer,foeMesh,gunGroup,muzzle,waterMesh;
 const me={x:-24,z:-24,yaw:0,pitch:0,hp:100,score:0,cd:0,prot:0,slots:[0,null],sel:0,
@@ -510,6 +519,85 @@ function makeLabelSprite(text,colHex){
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthWrite:false}));
   sp.scale.set(2.4,0.6,1);
   return sp;
+}
+
+// アイテムの見た目(ビーム+モデル+ラベル)を作る(全マップ共通)
+function makeItemGroup(kind,w){
+  const col = kind==='gun'?WPN[w].col : kind==='nade'?NADE_COL :
+    kind==='smoke'?0x9aa0b0 : kind==='scope2'?0x8ad0f0 : kind==='scope4'?0xb78ae8 : kind==='scope8'?0xf0d060 :
+    kind==='noz'?0xff9a3c : kind==='stk'?0xc08a50 : kind==='heal'?0x7ae87a :
+    kind==='ammo5'?0xffd166 : kind==='ammo7'?0xff8a5a : kind==='ammo9'?0xd0d6de : AMMO_COL;
+  const g=new THREE.Group();
+  const bh=mapSel===1?6:26;
+  const beam=new THREE.Mesh(
+    new THREE.CylinderGeometry(0.28,0.28,bh,8,1,true),
+    new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0.28, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
+  beam.position.y=bh/2; g.add(beam);
+  const obj=new THREE.Group();
+  const LM=c=>new THREE.MeshLambertMaterial({color:c});
+  if(kind==='gun'){
+    if(WPN[w].cls!=='snp'){ // AR/SMG系: コンパクト+マガジン
+    const body=new THREE.Mesh(new THREE.BoxGeometry(0.75,0.24,0.18), LM(col));
+    const mag=new THREE.Mesh(new THREE.BoxGeometry(0.15,0.32,0.16), LM(0x333844));
+    mag.position.set(0.06,-0.26,0);
+    const bar=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.28,6), LM(0x333844));
+    bar.rotation.z=Math.PI/2; bar.position.set(-0.5,0.04,0);
+    const grip=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.24,0.14), LM(0x333844));
+    grip.position.set(0.28,-0.2,0);
+    obj.add(body,mag,bar,grip);
+    } else { // スナイパー: 長銃身+スコープ
+    const body=new THREE.Mesh(new THREE.BoxGeometry(1.15,0.18,0.15), LM(col));
+    const bar=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.55,6), LM(0x333844));
+    bar.rotation.z=Math.PI/2; bar.position.set(-0.8,0.04,0);
+    const sc=new THREE.Mesh(new THREE.CylinderGeometry(0.065,0.065,0.32,8), LM(0x22262e));
+    sc.rotation.z=Math.PI/2; sc.position.set(0.1,0.19,0);
+    const grip=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.28,0.14), LM(0x5a4632));
+    grip.position.set(0.35,-0.2,0);
+    obj.add(body,bar,sc,grip);
+    }
+  } else if(kind==='noz'){ // ノズル: 先細りサプレッサー風
+    const tube=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.11,0.45,8), LM(0x2c313c));
+    tube.rotation.z=Math.PI/2;
+    const band=new THREE.Mesh(new THREE.CylinderGeometry(0.115,0.115,0.1,8), LM(col));
+    band.rotation.z=Math.PI/2;
+    const tip=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.09,0.12,8), LM(0x454b58));
+    tip.rotation.z=Math.PI/2; tip.position.x=-0.28;
+    obj.add(tube,band,tip);
+  } else if(kind==='stk'){ // ストック: L字の木製
+    const top=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.14,0.14), LM(col));
+    const pad=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.4,0.16), LM(0x8a6238));
+    pad.position.set(0.28,-0.14,0); pad.rotation.z=-0.15;
+    obj.add(top,pad);
+  } else if(kind==='heal'){
+    const box2=new THREE.Mesh(new THREE.BoxGeometry(0.44,0.3,0.36), LM(0xf2f2f2));
+    const cr1=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.09,0.37), LM(0x3fae5a));
+    const cr2=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.26,0.37), LM(0x3fae5a));
+    obj.add(box2,cr1,cr2);
+  } else if(kind==='nade'){
+    const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x4a5d3a}));
+    const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.14,6), new THREE.MeshLambertMaterial({color:0x9aa0b0}));
+    cap.position.y=0.26; obj.add(b,cap);
+  } else if(kind==='smoke'){
+    const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x788088}));
+    const band=new THREE.Mesh(new THREE.CylinderGeometry(0.245,0.245,0.08,10,1,true), new THREE.MeshLambertMaterial({color:0xe8e8e8}));
+    obj.add(b,band);
+  } else if(kind==='scope2'||kind==='scope4'||kind==='scope8'){
+    const tube=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.12,0.5,8), new THREE.MeshLambertMaterial({color:0x2c313c}));
+    tube.rotation.z=Math.PI/2;
+    const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.02,8), new THREE.MeshBasicMaterial({color:col}));
+    lens.rotation.z=Math.PI/2; lens.position.x=0.26;
+    obj.add(tube,lens);
+  } else {
+    const box=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.34,0.36), new THREE.MeshLambertMaterial({color:0x8a7444}));
+    const stripe=new THREE.Mesh(new THREE.BoxGeometry(0.52,0.1,0.38), new THREE.MeshLambertMaterial({color:col}));
+    obj.add(box,stripe);
+  }
+  g.add(obj);
+  const label=makeLabelSprite(kind==='gun'?WPN[w].name:ITEM_LBL[kind], '#'+col.toString(16).padStart(6,'0'));
+  label.position.y=1.75;
+  g.add(label);
+  g.userData.obj=obj;
+  return g;
 }
 
 // 位置ハッシュで頂点を揺らす(シーム安全・決定的)
@@ -1165,81 +1253,10 @@ function buildWorld(rng){
       x=Math.cos(ang)*r; z=Math.sin(ang)*r;
       if(groundY(x,z)>WATER_Y+0.6) break;
     }
-    const col = kind==='gun'?WPN[w].col : kind==='nade'?NADE_COL :
-      kind==='smoke'?0x9aa0b0 : kind==='scope2'?0x8ad0f0 : kind==='scope4'?0xb78ae8 : kind==='scope8'?0xf0d060 :
-      kind==='noz'?0xff9a3c : kind==='stk'?0xc08a50 : kind==='heal'?0x7ae87a :
-      kind==='ammo5'?0xffd166 : kind==='ammo7'?0xff8a5a : kind==='ammo9'?0xd0d6de : AMMO_COL;
-    const g=new THREE.Group();
-    const beam=new THREE.Mesh(
-      new THREE.CylinderGeometry(0.28,0.28,26,8,1,true),
-      new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0.28, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
-    beam.position.y=13; g.add(beam);
-    const obj=new THREE.Group();
-    const LM=c=>new THREE.MeshLambertMaterial({color:c});
-    if(kind==='gun'){
-      if(WPN[w].cls!=='snp'){ // AR/SMG系: コンパクト+マガジン
-        const body=new THREE.Mesh(new THREE.BoxGeometry(0.75,0.24,0.18), LM(col));
-        const mag=new THREE.Mesh(new THREE.BoxGeometry(0.15,0.32,0.16), LM(0x333844));
-        mag.position.set(0.06,-0.26,0);
-        const bar=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.28,6), LM(0x333844));
-        bar.rotation.z=Math.PI/2; bar.position.set(-0.5,0.04,0);
-        const grip=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.24,0.14), LM(0x333844));
-        grip.position.set(0.28,-0.2,0);
-        obj.add(body,mag,bar,grip);
-      } else { // スナイパー: 長銃身+スコープ
-        const body=new THREE.Mesh(new THREE.BoxGeometry(1.15,0.18,0.15), LM(col));
-        const bar=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.55,6), LM(0x333844));
-        bar.rotation.z=Math.PI/2; bar.position.set(-0.8,0.04,0);
-        const sc=new THREE.Mesh(new THREE.CylinderGeometry(0.065,0.065,0.32,8), LM(0x22262e));
-        sc.rotation.z=Math.PI/2; sc.position.set(0.1,0.19,0);
-        const grip=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.28,0.14), LM(0x5a4632));
-        grip.position.set(0.35,-0.2,0);
-        obj.add(body,bar,sc,grip);
-      }
-    } else if(kind==='noz'){ // ノズル: 先細りサプレッサー風
-      const tube=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.11,0.45,8), LM(0x2c313c));
-      tube.rotation.z=Math.PI/2;
-      const band=new THREE.Mesh(new THREE.CylinderGeometry(0.115,0.115,0.1,8), LM(col));
-      band.rotation.z=Math.PI/2;
-      const tip=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.09,0.12,8), LM(0x454b58));
-      tip.rotation.z=Math.PI/2; tip.position.x=-0.28;
-      obj.add(tube,band,tip);
-    } else if(kind==='stk'){ // ストック: L字の木製
-      const top=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.14,0.14), LM(col));
-      const pad=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.4,0.16), LM(0x8a6238));
-      pad.position.set(0.28,-0.14,0); pad.rotation.z=-0.15;
-      obj.add(top,pad);
-    } else if(kind==='heal'){
-      const box2=new THREE.Mesh(new THREE.BoxGeometry(0.44,0.3,0.36), LM(0xf2f2f2));
-      const cr1=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.09,0.37), LM(0x3fae5a));
-      const cr2=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.26,0.37), LM(0x3fae5a));
-      obj.add(box2,cr1,cr2);
-    } else if(kind==='nade'){
-      const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x4a5d3a}));
-      const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.14,6), new THREE.MeshLambertMaterial({color:0x9aa0b0}));
-      cap.position.y=0.26; obj.add(b,cap);
-    } else if(kind==='smoke'){
-      const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x788088}));
-      const band=new THREE.Mesh(new THREE.CylinderGeometry(0.245,0.245,0.08,10,1,true), new THREE.MeshLambertMaterial({color:0xe8e8e8}));
-      obj.add(b,band);
-    } else if(kind==='scope2'||kind==='scope4'||kind==='scope8'){
-      const tube=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.12,0.5,8), new THREE.MeshLambertMaterial({color:0x2c313c}));
-      tube.rotation.z=Math.PI/2;
-      const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.02,8), new THREE.MeshBasicMaterial({color:col}));
-      lens.rotation.z=Math.PI/2; lens.position.x=0.26;
-      obj.add(tube,lens);
-    } else {
-      const box=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.34,0.36), new THREE.MeshLambertMaterial({color:0x8a7444}));
-      const stripe=new THREE.Mesh(new THREE.BoxGeometry(0.52,0.1,0.38), new THREE.MeshLambertMaterial({color:col}));
-      obj.add(box,stripe);
-    }
-    g.add(obj);
-    const label=makeLabelSprite(kind==='gun'?WPN[w].name:ITEM_LBL[kind], '#'+col.toString(16).padStart(6,'0'));
-    label.position.y=1.75;
-    g.add(label);
+    const g=makeItemGroup(kind,w);
     g.position.set(x, groundY(x,z), z);
     scene.add(g);
-    items.push({id,kind,w,x,z,g,obj,active:true,rt:0});
+    items.push({id,kind,w,x,z,g,obj:g.userData.obj,active:true,rt:0});
   }
   let id=0;
   const GUNS=[1,3,4,2,5];
@@ -1304,6 +1321,139 @@ let bushParts=null, logParts=null, stumpParts=null;
 loadModelParts('assets/bush.glb', p=>{ bushParts=p; });
 loadModelParts('assets/log.glb', p=>{ logParts=p; });
 loadModelParts('assets/stump.glb', p=>{ stumpParts=p; });
+
+
+// ---------------- 屋内アリーナ(マップ2) ----------------
+// 2階建ての屋内マップ。2階は外周回廊+中央の十字ブリッジ(4方向から合流)。
+// ブリッジは吹き抜けの上で手すりなし=踏み外すと1階へ落ちる。
+function buildWorldIndoor(rng){
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x23262e);
+  scene.fog=new THREE.Fog(0x23262e, 34, 105);
+  camera=new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 300);
+  camera.rotation.order='YXZ';
+  scene.add(new THREE.HemisphereLight(0xf0f2f8, 0x4a4e58, 1.15));
+  const sun=new THREE.DirectionalLight(0xfff2d8, 0.5);
+  sun.position.set(18,40,10); scene.add(sun);
+  obstacles=[]; platforms=[]; items=[]; waterMesh=null;
+  const H=20, FH=3.4, CW=4; // 半サイズ / 2階の高さ / 回廊の幅
+  const wallM=new THREE.MeshLambertMaterial({color:0xb9b2a4});
+  const slabM=new THREE.MeshLambertMaterial({color:0x9aa0a8});
+  const trimM=new THREE.MeshLambertMaterial({color:0x7b828c});
+  const crateM=new THREE.MeshLambertMaterial({color:0x8a6238});
+  function box(w,h,d,x,y,z,m){ const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m||wallM); b.position.set(x,y,z); scene.add(b); return b; }
+  function wallSeg(x0,z0,x1,z1,top){
+    const len=Math.hypot(x1-x0,z1-z0), n=Math.max(1,Math.ceil(len/0.55));
+    for(let i=0;i<=n;i++){ const t=i/n; obstacles.push({x:x0+(x1-x0)*t, z:z0+(z1-z0)*t, rr:0.35, top}); }
+  }
+  // 床(市松)と天井
+  const fc=document.createElement('canvas'); fc.width=fc.height=128;
+  const fx2=fc.getContext('2d');
+  for(let cy=0;cy<8;cy++) for(let cx2=0;cx2<8;cx2++){
+    fx2.fillStyle=(cx2+cy)%2?'#878d93':'#9aa0a6';
+    fx2.fillRect(cx2*16,cy*16,16,16);
+  }
+  const fTex=new THREE.CanvasTexture(fc);
+  fTex.wrapS=fTex.wrapT=THREE.RepeatWrapping; fTex.repeat.set(10,10);
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(H*2+4,H*2+4), new THREE.MeshLambertMaterial({color:0xffffff, map:fTex}));
+  floor.rotation.x=-Math.PI/2; scene.add(floor);
+  const ceil=new THREE.Mesh(new THREE.BoxGeometry(H*2+4,0.4,H*2+4), new THREE.MeshBasicMaterial({color:0x2c3038}));
+  ceil.position.y=7.4; scene.add(ceil);
+  for(let lx=-12;lx<=12;lx+=12) for(let lz=-12;lz<=12;lz+=12){
+    const lamp=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.1,1.6), new THREE.MeshBasicMaterial({color:0xfff4cc}));
+    lamp.position.set(lx,7.15,lz); scene.add(lamp);
+  }
+  // 外壁(高さ7)
+  for(const sd of [-1,1]){
+    box(H*2+0.8,7,0.4, 0,3.5,sd*(H+0.2));
+    box(0.4,7,H*2+0.8, sd*(H+0.2),3.5,0);
+  }
+  wallSeg(-H,-H, H,-H, 7); wallSeg(-H,H, H,H, 7);
+  wallSeg(-H,-H, -H,H, 7); wallSeg(H,-H, H,H, 7);
+  // 2階: 外周回廊
+  function plat(x0,x1,z0,z1){
+    box(x1-x0,0.25,z1-z0,(x0+x1)/2,FH-0.125,(z0+z1)/2,slabM);
+    platforms.push({x0,x1,z0,z1,y0:FH,y1:FH});
+  }
+  plat(-H,H, H-CW,H); plat(-H,H, -H,-H+CW);
+  plat(-H,-H+CW, -H+CW,H-CW); plat(H-CW,H, -H+CW,H-CW);
+  // 2階中央: 4方向から合流する十字ブリッジ(吹き抜け・手すりなし)
+  plat(-3,3,-3,3);
+  plat(-1.3,1.3, 3,H-CW); plat(-1.3,1.3, -H+CW,-3);
+  plat(3,H-CW, -1.3,1.3); plat(-H+CW,-3, -1.3,1.3);
+  // 中央ブリッジの支柱(1階の遮蔽物にもなる)
+  for(const px of [-3,3]) for(const pz of [-3,3]){
+    const pil=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.4,FH,8), trimM);
+    pil.position.set(px,FH/2,pz); scene.add(pil);
+    obstacles.push({x:px,z:pz,rr:0.4,top:FH-0.1});
+  }
+  // 1階→2階のスロープ×4(各回廊の内縁に接続)
+  function ramp(p){ // p: {x0,x1,z0,z1,axis,lowEnd} lowEnd:'start'|'end'
+    const y0=p.lowEnd==='start'?0.02:FH, y1=p.lowEnd==='start'?FH:0.02;
+    platforms.push({x0:p.x0,x1:p.x1,z0:p.z0,z1:p.z1,axis:p.axis,y0,y1});
+    const len=p.axis==='x'?p.x1-p.x0:p.z1-p.z0;
+    const wdt=p.axis==='x'?p.z1-p.z0:p.x1-p.x0;
+    const m=box(p.axis==='x'?Math.hypot(len,FH):wdt, 0.2, p.axis==='x'?wdt:Math.hypot(len,FH),
+      (p.x0+p.x1)/2, FH/2, (p.z0+p.z1)/2, slabM);
+    const ang=Math.atan2(FH,len);
+    if(p.axis==='x') m.rotation.z=(p.lowEnd==='start'?1:-1)*ang;
+    else m.rotation.x=(p.lowEnd==='start'?-1:1)*ang;
+  }
+  ramp({x0:6,x1:8.6, z0:9,z1:H-CW, axis:'z', lowEnd:'start'});    // 北回廊へ
+  ramp({x0:-8.6,x1:-6, z0:-H+CW,z1:-9, axis:'z', lowEnd:'end'});  // 南回廊へ
+  ramp({z0:6,z1:8.6, x0:9,x1:H-CW, axis:'x', lowEnd:'start'});    // 東回廊へ
+  ramp({z0:-8.6,z1:-6, x0:-H+CW,x1:-9, axis:'x', lowEnd:'end'});  // 西回廊へ
+  // 1階の遮蔽物: 低い壁と木箱
+  for(const [wx,wz,wr] of [[-10,0,0],[10,0,0],[0,-10,1],[0,10,1]]){
+    if(wr===0){ box(0.35,2.1,5, wx,1.05,wz,wallM); wallSeg(wx,wz-2.5, wx,wz+2.5, 2.1); }
+    else { box(5,2.1,0.35, wx,1.05,wz,wallM); wallSeg(wx-2.5,wz, wx+2.5,wz, 2.1); }
+  }
+  for(let i=0;i<8;i++){
+    let bx=0,bz=0;
+    for(let tr=0;tr<20;tr++){
+      bx=(rng()*2-1)*15; bz=(rng()*2-1)*15;
+      if(Math.abs(bx)>4.5 || Math.abs(bz)>4.5) break;
+    }
+    box(1.4,1.4,1.4, bx,0.7,bz, crateM);
+    obstacles.push({x:bx,z:bz,rr:1.0,top:1.5});
+  }
+  // アイテム
+  let id=0;
+  function addIndoorItem(kind,w){
+    let x=0,z=0;
+    for(let tr=0;tr<20;tr++){
+      x=(rng()*2-1)*15.5; z=(rng()*2-1)*15.5;
+      let blocked=false;
+      for(const o of obstacles){ if(Math.hypot(x-o.x,z-o.z)<o.rr+0.7){ blocked=true; break; } }
+      if(!blocked && (Math.abs(x)>4 || Math.abs(z)>4)) break;
+    }
+    const g=makeItemGroup(kind,w);
+    g.position.set(x,0,z);
+    scene.add(g);
+    items.push({id,kind,w,x,z,g,obj:g.userData.obj,active:true,rt:0});
+    id++;
+  }
+  const GUNS=[1,3,4,2,5];
+  for(let i=0;i<8;i++) addIndoorItem('gun',GUNS[i%5]);
+  for(let i=0;i<4;i++) addIndoorItem('nade',0);
+  for(let i=0;i<2;i++) addIndoorItem('ammo5',0);
+  for(let i=0;i<2;i++) addIndoorItem('ammo7',0);
+  for(let i=0;i<2;i++) addIndoorItem('ammo9',0);
+  for(let i=0;i<4;i++) addIndoorItem('heal',0);
+  for(let i=0;i<2;i++) addIndoorItem('smoke',0);
+
+  foeMesh=hamModel(!isHost);
+  scene.add(foeMesh);
+  foeBall=new THREE.Mesh(new THREE.SphereGeometry(0.95,16,12),
+    new THREE.MeshLambertMaterial({color:0x9ad4ff, transparent:true, opacity:0.3, depthWrite:false}));
+  foeBall.visible=false;
+  scene.add(foeBall);
+  gunGroup=new THREE.Group();
+  camera.add(gunGroup); scene.add(camera);
+  muzzle=new THREE.Mesh(new THREE.SphereGeometry(0.09,8,6),
+    new THREE.MeshBasicMaterial({color:0xffd98a, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false}));
+  buildViewModel();
+}
 
 // ---------------- 3Dハムスターモデル(GLB) ----------------
 let hamGLB=null, hamClips=[];
@@ -1896,7 +2046,7 @@ function updatePickChips(){
 // ---------------- ゲーム制御 ----------------
 function onData(d){
   switch(d.t){
-    case 'init': seed=d.seed; startGame(); break;
+    case 'init': seed=d.seed; mapSel=d.map||0; startGame(); break;
     case 'pos': foe.tx=d.x; foe.tz=d.z; foe.ta=d.a; foe.prone=!!d.p; foe.ball=!!d.b;
       foe.tfy=(typeof d.y==='number')?d.y:groundY(d.x,d.z); break;
     case 'shot': spawnProjectile(new THREE.Vector3(d.x,d.y,d.z), new THREE.Vector3(d.dx,d.dy,d.dz), d.w, false); sfxShot(d.w, volAt(d.x,d.z,50)*0.85); break;
@@ -1923,12 +2073,20 @@ function startGame(){
   applyThumbUI();
   $('hpLabel').style.color = isHost ? '#5aa5e8' : '#f096b4';
   const rng=mulberry32(seed);
-  heightFn=buildHeightFn(rng);
+  if(mapSel===1){ // 屋内アリーナ: 平らな床・壁が境界
+    PLAY_R=32;
+    SPAWNS=[[-16,-16],[16,-16],[-16,16],[16,16]];
+    heightFn=(x,z)=>0;
+  } else {
+    PLAY_R=78;
+    SPAWNS=[[-42,-42],[42,-42],[-42,42],[42,42]];
+    heightFn=buildHeightFn(rng);
+  }
   renderer=new THREE.WebGLRenderer({antialias:false});
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.8));
   renderer.setSize(innerWidth,innerHeight);
   $('gameWrap').insertBefore(renderer.domElement, $('touchLayer'));
-  buildWorld(rng);
+  if(mapSel===1) buildWorldIndoor(rng); else buildWorld(rng);
   doReset();
   if(training){
     foeMesh.visible=false;
@@ -2032,7 +2190,10 @@ function spawnBalloon(id,x,y,z,c){
 function hostSpawnBalloon(){
   const id=balloonSeq++;
   let x=0,z=0,y=0;
-  for(let tr=0;tr<20;tr++){
+  if(mapSel===1){
+    x=(Math.random()*2-1)*16; z=(Math.random()*2-1)*16;
+    y=1.3+Math.random()*4.6;
+  } else for(let tr=0;tr<20;tr++){
     const ang=Math.random()*6.28, r=4+Math.random()*58;
     x=Math.cos(ang)*r; z=Math.sin(ang)*r;
     const h=groundY(x,z);
@@ -2066,7 +2227,8 @@ function spawnDummies(){
   const [cx,cz]=[me.x,me.z];
   const offs=[[0,-10],[-6,-9],[6,-9],[-3,-14],[3,-14]];
   for(let i=0;i<offs.length;i++){
-    const sp=safeSpot(cx+offs[i][0], cz+offs[i][1]);
+    let sp=safeSpot(cx+offs[i][0], cz+offs[i][1]);
+    if(mapSel===1) sp=[clamp(sp[0],-17,17), clamp(sp[1],-17,17)];
     const m=hamModel(i%2===1);
     const lb=makeLabelSprite('まと','#ffd166');
     lb.position.y=1.9; lb.scale.set(1.4,0.35,1);
