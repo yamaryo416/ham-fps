@@ -113,13 +113,6 @@
     display:flex; flex-direction:column; gap:4px; background:rgba(255,255,255,0.03); }
   .wcard .wname { font-size:14px; font-weight:700; }
   .wcard .wammo { font-size:10px; color:#9aa0b0; }
-  .attIcons { display:flex; gap:5px; min-height:34px; }
-  .aIcon { width:36px; height:34px; border-radius:8px; border:1.5px dashed #3a3f4e;
-    background:rgba(255,255,255,0.04); color:#fff; font-size:15px; font-family:inherit;
-    position:relative; touch-action:manipulation; }
-  .aIcon:disabled { opacity:0.28; }
-  .aIcon.on { border-style:solid; border-color:#ffd166; background:rgba(255,209,102,0.16); opacity:1; }
-  .aIcon small { position:absolute; bottom:0; right:2px; font-size:8px; color:#ffd166; }
   .attRow { display:flex; gap:7px; flex-wrap:wrap; }
   .chip { font-family:inherit; font-weight:700; font-size:12px; padding:7px 11px; border-radius:10px;
     border:1.5px solid #5aa5e8; background:rgba(45,123,196,0.25); color:#fff; touch-action:manipulation; }
@@ -197,7 +190,7 @@
 
 <div id="menuScreen" class="screen">
   <h1>ハムスター<span class="b">FPS</span><span class="p">アリーナ</span></h1>
-  <p class="sub">湖と森のフィールドでハムスターが1対1バトル。<br>近くのアイテムをタップして拾おう(武器・スコープ・回復など)。<br>相手を2回先に倒したら勝ち!🐹ボールに変身して体当たりもできる!<br>スマホは親指1本でOK(おやゆびモード)— ねらい・発射・アイテム回収は自動!</p>
+  <p class="sub">湖と森のフィールドでハムスターが1対1バトル。<br>近くのアイテムをタップして拾おう(武器・スコープ・回復など)。<br>相手を2回先に倒したら勝ち!🐹ボールに変身して体当たりもできる!<br>スマホは親指1本でOK(おやゆびモード)— ねらい・発射・アイテム回収は自動!<br>武器にはスコープ内蔵。予備弾はバッグで持ち運ぼう(タップで捨てられる)</p>
   <button class="btn btn-blue" id="btnCreate">部屋を作る(きんくまチーム)</button>
   <button class="btn btn-pink" id="btnJoinMenu">部屋に入る(しろくまチーム)</button>
   <button class="btn btn-green" id="btnTrain">射撃訓練場(ひとりで練習)</button>
@@ -382,37 +375,29 @@ function wire(){ conn.on('data',onData); conn.on('close',lostConn); conn.on('err
 function lostConn(){ if(state==='dead')return; state='dead'; show('lostScreen'); $('gameWrap').style.display='none'; }
 
 // ---------------- 定義 ----------------
-const PLAY_R=128, EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
+const PLAY_R=78, EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
+// AR/SMGは高連射・低威力、スナイパーは単発・高威力。スコープは最初から内蔵(zoom)
 const WPN=[
-  {name:'G18',   cal:'9mm', cls:'pst', dmg:20, cd:0.42, spd:70,  col:0x9aa3b2, spread:0.008, ammo:36, mag:12, rel:1.1, recoil:0.015},
-  {name:'M416',  cal:'5mm', cls:'ar',  dmg:13, cd:0.14, spd:75,  col:0x5ad0a5, spread:0.018, ammo:60, mag:30, rel:1.6, recoil:0.008},
-  {name:'Kar98', cal:'7mm', cls:'snp', dmg:42, cd:0.9,  spd:120, col:0xf0a54a, spread:0.003, ammo:15, mag:5,  rel:2.0, recoil:0.035},
-  {name:'UMP',   cal:'9mm', cls:'smg', dmg:10, cd:0.11, spd:65,  col:0x5ab8d0, spread:0.022, ammo:75, mag:25, rel:1.4, recoil:0.007},
-  {name:'M16',   cal:'5mm', cls:'ar',  dmg:17, cd:0.19, spd:85,  col:0xd08a5a, spread:0.014, ammo:48, mag:20, rel:1.7, recoil:0.011},
-  {name:'AWM',   cal:'7mm', cls:'snp', dmg:55, cd:1.3,  spd:140, col:0xb78ae8, spread:0.002, ammo:9,  mag:3,  rel:2.4, recoil:0.05}
+  {name:'G18',   cal:'9mm', cls:'pst', dmg:16, cd:0.3,   spd:70,  col:0x9aa3b2, spread:0.010, ammo:45, mag:15, rel:1.0, recoil:0.012, zoom:1.35},
+  {name:'M416',  cal:'5mm', cls:'ar',  dmg:9,  cd:0.09,  spd:75,  col:0x5ad0a5, spread:0.020, ammo:90, mag:30, rel:1.4, recoil:0.006, zoom:2},
+  {name:'Kar98', cal:'7mm', cls:'snp', dmg:60, cd:1.5,   spd:120, col:0xf0a54a, spread:0.003, ammo:15, mag:5,  rel:1.8, recoil:0.04,  zoom:4},
+  {name:'UMP',   cal:'9mm', cls:'smg', dmg:7,  cd:0.065, spd:65,  col:0x5ab8d0, spread:0.024, ammo:100,mag:30, rel:1.2, recoil:0.005, zoom:2},
+  {name:'M16',   cal:'5mm', cls:'ar',  dmg:11, cd:0.11,  spd:85,  col:0xd08a5a, spread:0.016, ammo:80, mag:25, rel:1.5, recoil:0.008, zoom:2},
+  {name:'AWM',   cal:'7mm', cls:'snp', dmg:80, cd:2.2,   spd:140, col:0xb78ae8, spread:0.002, ammo:9,  mag:3,  rel:2.2, recoil:0.06,  zoom:8}
 ];
-// スコープ対応: 2倍=SMG/AR/スナイパー, 4倍=AR/スナイパー, 8倍=スナイパーのみ
-function scopeFits(k,wid){
-  const c=WPN[wid].cls;
-  if(k==='s2') return c==='smg'||c==='ar'||c==='snp';
-  if(k==='s4') return c==='ar'||c==='snp';
-  if(k==='s8') return c==='snp';
-  return false;
-}
-const ITEM_LBL={nade:'グレネード',ammo5:'5mm弾',ammo7:'7mm弾',ammo9:'9mm弾',
-  scope2:'2倍スコープ',scope4:'4倍スコープ',scope8:'8倍スコープ',smoke:'煙玉',noz:'ノズル',stk:'ストック',heal:'回復キット'};
-const STACK_CAP={ammo5:60,ammo7:60,ammo9:60,nade:2,smoke:2,heal:4,s2:1,s4:1,s8:1,noz:1,stk:1};
-const RES_CAP=240; // 予備弾の上限
+const ammoKind=wid=>'ammo'+WPN[wid].cal[0]; // 予備弾はバッグのスタックで持つ
+const resAmmo=wid=>bagCount(ammoKind(wid));
+const ITEM_LBL={nade:'グレネード',ammo5:'5mm弾',ammo7:'7mm弾',ammo9:'9mm弾',smoke:'煙玉',heal:'回復キット'};
+const STACK_CAP={ammo5:60,ammo7:60,ammo9:60,nade:2,smoke:2,heal:4};
 const BAG_SLOTS=8;
 const NADE_COL=0xe24b4a, AMMO_COL=0xffd166, NADE_MAX=4, SMOKE_MAX=2;
 const BALLOON_COLS=[0xe84b4a,0xffd166,0x5ad0a5,0x5aa5e8,0xf096b4,0xb78ae8];
-const SPAWNS=[[-65,-65],[65,-65],[-65,65],[65,65]];
+const SPAWNS=[[-42,-42],[42,-42],[-42,42],[42,42]];
 let heightFn=null, obstacles=[], items=[];
 let scene,camera,renderer,foeMesh,gunGroup,muzzle,waterMesh;
 const me={x:-24,z:-24,yaw:0,pitch:0,hp:100,score:0,cd:0,prot:0,slots:[0,null],sel:0,
-  ammo:{}, mag:{}, rld:null,feetY:0,eyeY:0,zoom:false,prone:false,healT:0,stow:false,ball:false,ballE:1,
-  bag:[],
-  watt:{0:{scope:null,noz:false,stk:false},1:{scope:null,noz:false,stk:false}}};
+  mag:{}, rld:null,feetY:0,eyeY:0,zoom:false,prone:false,healT:0,stow:false,ball:false,ballE:1,
+  bag:[]};
 // バッグ(8スロット・スタック制)
 function bagCount(k){ let n=0; for(const s of me.bag) if(s.k===k) n+=s.n; return n; }
 function bagAdd(k,n){
@@ -446,7 +431,7 @@ let pFoeX=null, pFoeZ=null, foeStepAcc=0, myStepAcc=0, bobPhase=0, walkAmp=0, ad
 let balloons=new Map(), balloonSeq=0, balloonTimer=0.5, myBalloons=0, foeBalloons=0, smokeClouds=[];
 let training=false, dummies=[], dmgNums=[];
 let deathFxs=[], victoryFx=null;
-let foeBall=null, ramCd=0, kbX=0, kbZ=0, lockPrev=false, lastBallP=-1;
+let foeBall=null, ramCd=0, kbX=0, kbZ=0, lockPrev=false, lastBallP=-1, dashT=0;
 
 // ---------------- 質感テクスチャ ----------------
 let _groundTex=null, _furTex=null, _barkTex=null;
@@ -554,7 +539,7 @@ function buildHeightFn(rng){
   // フィールド内の山(広く高いガウス峰)
   const peaks=[];
   for(let i=0;i<7;i++){
-    const a=rng()*6.28, r=20+rng()*85;
+    const a=rng()*6.28, r=15+rng()*42;
     peaks.push({x:Math.cos(a)*r, z:Math.sin(a)*r, h:8+rng()*9, s:10+rng()*10});
   }
   const raw=(x,z)=>{
@@ -573,7 +558,7 @@ function buildHeightFn(rng){
   // 工場用地(低地を選んで平らにならす)
   let fx=25, fz=0, fh=0;
   for(let i=0;i<12;i++){
-    const fa=rng()*6.28, fr=24+rng()*40;
+    const fa=rng()*6.28, fr=18+rng()*28;
     fx=Math.cos(fa)*fr; fz=Math.sin(fa)*fr;
     fh=raw(fx,fz);
     if(fh>WATER_Y+1.0 && fh<10) break;
@@ -583,10 +568,10 @@ function buildHeightFn(rng){
   // マンション用地(平原=低くて平らな場所、工場から離す)
   let mx=-40, mz=20, mh=0;
   for(let i=0;i<16;i++){
-    const ma=rng()*6.28, mr=32+rng()*58;
+    const ma=rng()*6.28, mr=26+rng()*28;
     mx=Math.cos(ma)*mr; mz=Math.sin(ma)*mr;
     mh=raw(mx,mz);
-    if(mh>WATER_Y+1.2 && mh<6 && Math.hypot(mx-fx,mz-fz)>44) break;
+    if(mh>WATER_Y+1.2 && mh<6 && Math.hypot(mx-fx,mz-fz)>36) break;
   }
   mh=clamp(mh, WATER_Y+1.4, 8);
   mansionSite={x:mx, z:mz, h:mh};
@@ -860,7 +845,7 @@ function buildWorld(rng){
   const housePos=[];
   let placedH=0;
   for(let att2=0; att2<80 && placedH<3; att2++){
-    const ang=rng()*6.28, r=18+rng()*88;
+    const ang=rng()*6.28, r=14+rng()*46;
     const x=Math.cos(ang)*r, z=Math.sin(ang)*r, h=groundY(x,z);
     if(h<=WATER_Y+1.0 || h>10) continue;
     if(Math.hypot(x-factorySite.x, z-factorySite.z)<26) continue;
@@ -876,7 +861,7 @@ function buildWorld(rng){
   }
   // 岩(GLB×2種 or 手作りフォールバック)— 乱数消費は両パスで同一
   for(let i=0;i<26;i++){
-    const ang=rng()*6.28, r=7+rng()*112, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+    const ang=rng()*6.28, r=6+rng()*60, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
     if(groundY(x,z)<WATER_Y+0.3 || nearMansion(x,z,12)){ continue; }
     const rad=1.0+rng()*1.8;
     const c1=rng(), c2=rng(), c3=rng();          // 色(手作り) / 種類・向き(GLB)に再利用
@@ -983,7 +968,7 @@ function buildWorld(rng){
   for(let i=0;i<56;i++){
     let x=0,z=0,ok=false;
     for(let tr=0;tr<14;tr++){
-      const ang=rng()*6.28, r=6+rng()*112;
+      const ang=rng()*6.28, r=6+rng()*58;
       x=Math.cos(ang)*r; z=Math.sin(ang)*r;
       const h=groundY(x,z);
       if(h>WATER_Y+1.2 && h<8 && !nearMansion(x,z,12)){ ok=true; break; }
@@ -1030,14 +1015,14 @@ function buildWorld(rng){
     for(const m of meshes) scene.add(m);
   }
   for(let i=0;i<5;i++){
-    const a=rng()*6.28, r=25+rng()*88;
+    const a=rng()*6.28, r=20+rng()*40;
     addForest(Math.cos(a)*r, Math.sin(a)*r, 11+rng()*5, 32);
   }
   // 倒木と切り株
   for(let i=0;i<8;i++){
     let x=0,z=0,ok=false;
     for(let tr=0;tr<12;tr++){
-      const ang=rng()*6.28, r=6+rng()*104;
+      const ang=rng()*6.28, r=6+rng()*56;
       x=Math.cos(ang)*r; z=Math.sin(ang)*r;
       const h=groundY(x,z);
       if(h>WATER_Y+0.8 && h<5 && !nearMansion(x,z,12)){ ok=true; break; }
@@ -1071,7 +1056,7 @@ function buildWorld(rng){
     obstacles.push({x,z,rr:0.55,top:h+rad*2.2});
   }
   for(let i=0;i<6;i++){
-    const ang=rng()*6.28, r=6+rng()*104, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+    const ang=rng()*6.28, r=6+rng()*56, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
     const h=groundY(x,z);
     if(h<WATER_Y+0.8 || h>5 || nearMansion(x,z,12)) continue;
     if(stumpParts){
@@ -1095,7 +1080,7 @@ function buildWorld(rng){
   }
   // 茂み(GLB or 手作り)— 乱数消費は両パスで同一
   for(let i=0;i<34;i++){
-    const ang=rng()*6.28, r=5+rng()*112, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+    const ang=rng()*6.28, r=5+rng()*58, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
     if(groundY(x,z)<WATER_Y+0.5 || nearMansion(x,z,11)) continue;
     const s=0.4+rng()*0.5;
     const c1=rng(), c2=rng(), c3=rng();
@@ -1121,7 +1106,7 @@ function buildWorld(rng){
   for(let m=0;m<3;m++){
     const inst=new THREE.InstancedMesh(grassGeo, new THREE.MeshLambertMaterial({color:gCols[m]}), 400);
     for(let i=0;i<400;i++){
-      const ang=rng()*6.28, r=3+rng()*122, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+      const ang=rng()*6.28, r=3+rng()*66, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
       const h=groundY(x,z);
       if(h<WATER_Y+0.7 || h>6.5){
         dummy.position.set(0,-60,0); dummy.rotation.set(0,0,0); dummy.scale.setScalar(0.001);
@@ -1138,7 +1123,7 @@ function buildWorld(rng){
   const flCols=[0xffffff,0xffe08a,0xf0a9b8];
   const stemMat=new THREE.MeshLambertMaterial({color:0x3f7a2c});
   for(let i=0;i<60;i++){
-    const ang=rng()*6.28, r=3+rng()*100, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+    const ang=rng()*6.28, r=3+rng()*62, x=Math.cos(ang)*r, z=Math.sin(ang)*r;
     const h=groundY(x,z);
     if(h<WATER_Y+0.9 || h>5) continue;
     const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.22,4), stemMat);
@@ -1166,7 +1151,7 @@ function buildWorld(rng){
   function addItem(id,kind,w){
     let x=0,z=0;
     for(let tr=0;tr<20;tr++){
-      const ang=rng()*6.28, r=12+rng()*100;
+      const ang=rng()*6.28, r=10+rng()*52;
       x=Math.cos(ang)*r; z=Math.sin(ang)*r;
       if(groundY(x,z)>WATER_Y+0.6) break;
     }
@@ -1250,16 +1235,11 @@ function buildWorld(rng){
   const GUNS=[1,3,4,2,5];
   for(let i=0;i<10;i++) addItem(id++,'gun',GUNS[i%5]);
   for(let i=0;i<5;i++) addItem(id++,'nade',0);
-  for(let i=0;i<2;i++) addItem(id++,'ammo5',0);
+  for(let i=0;i<3;i++) addItem(id++,'ammo5',0);
   for(let i=0;i<2;i++) addItem(id++,'ammo7',0);
-  for(let i=0;i<2;i++) addItem(id++,'ammo9',0);
-  for(let i=0;i<4;i++) addItem(id++,'heal',0);
-  for(let i=0;i<2;i++) addItem(id++,'scope2',0);
-  for(let i=0;i<2;i++) addItem(id++,'scope4',0);
-  addItem(id++,'scope8',0);
+  for(let i=0;i<3;i++) addItem(id++,'ammo9',0);
+  for(let i=0;i<5;i++) addItem(id++,'heal',0);
   for(let i=0;i<3;i++) addItem(id++,'smoke',0);
-  for(let i=0;i<2;i++) addItem(id++,'noz',0);
-  for(let i=0;i<2;i++) addItem(id++,'stk',0);
 
   foeMesh=hamModel(!isHost);
   scene.add(foeMesh);
@@ -1574,26 +1554,13 @@ function buildViewModel(){
     p1.position.set(0,-0.16,0.15); p2.position.set(0.02,-0.02,0.28);
     muzzle.position.set(0,0.02,-0.58);
     gunGroup.add(body,barrel,grip,p1,p2,muzzle);
-    const wa=me.watt[me.sel];
-    if(wa.scope){
+    if(w.zoom>=2){ // スコープ内蔵の武器はスコープを表示
       const sc=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.04,0.18,8), new THREE.MeshLambertMaterial({color:0x22262e}));
       sc.rotation.x=Math.PI/2; sc.position.set(0,0.1,-0.06);
       const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.028,0.012,8),
-        new THREE.MeshBasicMaterial({color:wa.scope===2?0x8ad0f0:wa.scope===4?0xb78ae8:0xf0d060}));
+        new THREE.MeshBasicMaterial({color:w.zoom===2?0x8ad0f0:w.zoom===4?0xb78ae8:0xf0d060}));
       lens.rotation.x=Math.PI/2; lens.position.set(0,0.1,-0.155);
       gunGroup.add(sc,lens);
-    }
-    if(wa.noz){
-      const noz=new THREE.Mesh(new THREE.CylinderGeometry(0.038,0.045,0.14,8), new THREE.MeshLambertMaterial({color:0x2c313c}));
-      noz.rotation.x=Math.PI/2; noz.position.set(0,0.02,-0.62);
-      const band=new THREE.Mesh(new THREE.CylinderGeometry(0.047,0.047,0.04,8), new THREE.MeshLambertMaterial({color:0xff9a3c}));
-      band.rotation.x=Math.PI/2; band.position.set(0,0.02,-0.58);
-      gunGroup.add(noz,band);
-    }
-    if(wa.stk){
-      const stk=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.09,0.16), new THREE.MeshLambertMaterial({color:0xc08a50}));
-      stk.position.set(0,-0.04,0.32);
-      gunGroup.add(stk);
     }
     gunGroup.position.set(0.32,-0.3,-0.65);
     gunGroup.scale.setScalar(0.82);
@@ -1607,8 +1574,7 @@ function zoomX(){
   if(me.sel>1 || me.stow) return 1;
   const wid=me.slots[me.sel];
   if(wid===null) return 1;
-  const sc=me.watt[me.sel].scope;
-  return sc || 1.35;
+  return WPN[wid].zoom||1.35;
 }
 function setZoom(z){
   if(z && (zoomX()===1 || me.healT>0 || me.ball)) z=false;
@@ -1623,7 +1589,7 @@ function setZoom(z){
 function slotLabel(si){
   const wid=me.slots[si];
   if(wid===null) return 'ー';
-  return (me.watt[si].scope?'🔭':'')+WPN[wid].name+'<br>'+me.mag[wid]+'/'+me.ammo[wid];
+  return (WPN[wid].zoom>=2?'🔭':'')+WPN[wid].name+'<br>'+me.mag[wid]+'/'+resAmmo(wid);
 }
 function updSlots(){
   const s0=$('slot0'), s1=$('slot1'), tb=$('throwBtn');
@@ -1633,8 +1599,8 @@ function updSlots(){
   tb.innerHTML = me.sel===2 ? 'グレネード<br>×'+nN
                : me.sel===3 ? '煙玉<br>×'+nS
                : '投げ物<br>💣'+nN+' 💨'+nS;
-  s0.classList.toggle('empty', me.slots[0]===null || me.ammo[me.slots[0]]===0);
-  s1.classList.toggle('empty', me.slots[1]===null || (me.slots[1]!==null&&me.ammo[me.slots[1]]===0));
+  s0.classList.toggle('empty', me.slots[0]===null || (me.mag[me.slots[0]]===0&&resAmmo(me.slots[0])===0));
+  s1.classList.toggle('empty', me.slots[1]===null || (me.mag[me.slots[1]]===0&&resAmmo(me.slots[1])===0));
   tb.classList.toggle('empty', nN===0 && nS===0);
   s0.classList.toggle('sel', me.sel===0 && !me.stow);
   s1.classList.toggle('sel', me.sel===1 && !me.stow);
@@ -1652,8 +1618,8 @@ function updSlots(){
       $('ammoCnt').textContent='リロード中…';
       $('ammoCnt').style.color='#8ad0f0';
     } else {
-      $('ammoCnt').textContent=wid===null?'':me.mag[wid]+'/'+me.ammo[wid]+' '+WPN[wid].cal;
-      $('ammoCnt').style.color = (wid!==null&&me.mag[wid]===0&&me.ammo[wid]===0) ? '#f09595' : '#ffd98a';
+      $('ammoCnt').textContent=wid===null?'':me.mag[wid]+'/'+resAmmo(wid)+' '+WPN[wid].cal;
+      $('ammoCnt').style.color = (wid!==null&&me.mag[wid]===0&&resAmmo(wid)===0) ? '#f09595' : '#ffd98a';
     }
   }
   $('adsBtn').disabled = zoomX()===1;
@@ -1788,79 +1754,38 @@ function chip(text, cls, fn){
   }
   return b;
 }
-function detach(si,kind){
-  const a=me.watt[si];
-  if(kind==='scope'){
-    if(!a.scope) return;
-    if(!bagAdd(a.scope===2?'s2':a.scope===4?'s4':'s8',1)){ bagFullMsg(); return; }
-    a.scope=null; setZoom(false);
-  } else {
-    if(!a[kind]) return;
-    if(!bagAdd(kind,1)){ bagFullMsg(); return; }
-    a[kind]=false;
-  }
-  sfxPick(); buildViewModel(); updBag(); updSlots();
-}
-function attach(kind){
-  if(bagCount(kind)<=0) return;
-  if(autoAttachKind(kind)){ bagConsume(kind,1); sfxPick(); updBag(); updSlots(); }
-  else toast(kind==='s2'?'2倍が付く武器がない(SMG/AR/スナイパー)':kind==='s4'?'4倍が付く武器がない(AR/スナイパー)':kind==='s8'?'8倍が付く武器がない(スナイパー)':'装着できる武器がない');
-}
 function updBag(){
   const rows=$('bagRows');
   rows.innerHTML='';
-  // 装備中の武器カード×2(横並び・アイコン式)
+  // 装備中の武器カード×2(横並び)
   const wcards=document.createElement('div'); wcards.id='wcards';
-  function aIcon(icon, on, sub, fn){
-    const b=document.createElement('button');
-    b.className='aIcon'+(on?' on':'');
-    b.innerHTML=icon+(sub?'<small>'+sub+'</small>':'');
-    if(on && fn){
-      b.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); fn(); },{passive:false});
-      b.addEventListener('mousedown', e=>{ e.stopPropagation(); fn(); });
-    }
-    if(!on) b.disabled=true;
-    return b;
-  }
   for(const si of [0,1]){
-    const wid=me.slots[si], a=me.watt[si];
+    const wid=me.slots[si];
     const card=document.createElement('div'); card.className='wcard';
     const nm=document.createElement('div'); nm.className='wname';
-    nm.textContent=wid===null?'(武器なし)':WPN[wid].name;
+    nm.textContent=wid===null?'(武器なし)':(WPN[wid].zoom>=2?'🔭':'')+WPN[wid].name;
     if(wid!==null){
       nm.style.color='#'+WPN[wid].col.toString(16).padStart(6,'0');
       card.style.borderColor='#'+WPN[wid].col.toString(16).padStart(6,'0');
     }
     const am=document.createElement('div'); am.className='wammo';
-    am.textContent=wid!==null?WPN[wid].cal+'弾 '+me.mag[wid]+'/'+me.ammo[wid]:'';
+    am.textContent=wid!==null?WPN[wid].cal+'弾 '+me.mag[wid]+'/'+resAmmo(wid):'';
     card.append(nm,am);
-    const row=document.createElement('div'); row.className='attIcons';
-    if(wid!==null){
-      row.append(aIcon('🔭', !!a.scope, a.scope?('×'+a.scope):'', ()=>detach(si,'scope')));
-      row.append(aIcon('🔩', a.noz, '', ()=>detach(si,'noz')));
-      row.append(aIcon('🪵', a.stk, '', ()=>detach(si,'stk')));
-    }
-    card.append(row);
     wcards.append(card);
   }
   rows.append(wcards);
-  // バッグの中身(8スロット・スタック制)
+  // バッグの中身(8スロット・スタック制)— 予備弾もここに入る
   const sec=document.createElement('div'); sec.className='bagSec';
-  sec.textContent='バッグ('+me.bag.length+'/'+BAG_SLOTS+'スロット)— タップで使用/装着';
+  sec.textContent='バッグ('+me.bag.length+'/'+BAG_SLOTS+'スロット)— タップで使用/捨てる';
   rows.append(sec);
   const grid=document.createElement('div'); grid.id='bagGrid';
   const INFO={
-    ammo5:{ic:'📦',nm:'5mm弾',act:'補給'},
-    ammo7:{ic:'📦',nm:'7mm弾',act:'補給'},
-    ammo9:{ic:'📦',nm:'9mm弾',act:'補給'},
+    ammo5:{ic:'📦',nm:'5mm弾',act:'捨てる'},
+    ammo7:{ic:'📦',nm:'7mm弾',act:'捨てる'},
+    ammo9:{ic:'📦',nm:'9mm弾',act:'捨てる'},
     nade:{ic:'💣',nm:'グレネード',act:''},
     smoke:{ic:'💨',nm:'煙玉',act:''},
-    heal:{ic:'💊',nm:'回復キット',act:'+20'},
-    s2:{ic:'🔭',nm:'2倍スコープ',act:'装着'},
-    s4:{ic:'🔭',nm:'4倍スコープ',act:'装着'},
-    s8:{ic:'🔭',nm:'8倍スコープ',act:'装着'},
-    noz:{ic:'🔩',nm:'ノズル',act:'装着'},
-    stk:{ic:'🪵',nm:'ストック',act:'装着'}
+    heal:{ic:'💊',nm:'回復キット',act:'+20'}
   };
   for(let i=0;i<BAG_SLOTS;i++){
     const st=me.bag[i];
@@ -1871,23 +1796,16 @@ function updBag(){
       b.innerHTML=inf.ic+' '+inf.nm+'<br><small>×'+st.n+(inf.act?'・'+inf.act:'')+'</small>';
       const act=()=>{
         if(st.k==='ammo5'||st.k==='ammo7'||st.k==='ammo9'){
-          const cal=st.k.slice(4)+'mm';
-          let matched=false;
-          for(const s of me.slots) if(s!==null && WPN[s].cal===cal) matched=true;
-          if(!matched){ toast(cal+'の武器を持っていない'); return; }
-          const take=st.n;
-          bagConsume(st.k,take);
-          for(const s of me.slots){
-            if(s!==null && WPN[s].cal===cal) me.ammo[s]=Math.min(RES_CAP, me.ammo[s]+take);
-          }
-          toast(cal+'弾を予備に追加!'); sfxPick(); updSlots(); updBag();
+          // 弾のスタックを捨ててスロットを空ける
+          const idx=me.bag.indexOf(st);
+          if(idx>=0) me.bag.splice(idx,1);
+          toast(st.k.slice(4)+'mm弾 ×'+st.n+' を捨てた');
+          sfxPick(); updSlots(); updBag();
         } else if(st.k==='heal'){
           if(me.hp>=100){ toast('HPは満タン!'); return; }
           bagConsume('heal',1);
           me.hp=Math.min(100,me.hp+20);
           toast('回復!+20'); sfxPick(); updBars(); updBag();
-        } else if(st.k==='s2'||st.k==='s4'||st.k==='s8'||st.k==='noz'||st.k==='stk'){
-          attach(st.k);
         } else {
           toast('投げ物は右下の「投げ物」ボタンで使おう');
         }
@@ -2004,20 +1922,14 @@ function startGame(){
 }
 function onResize(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); }
 function resetLoadout(){
-  returnAtts(0); returnAtts(1); // 装着中のアタッチメントはバッグへ戻る
   me.slots=[0,null]; me.sel=0; me.stow=false;
-  me.ammo={}; me.mag={};
-  for(let i=0;i<WPN.length;i++){ me.ammo[i]=0; me.mag[i]=0; }
-  me.ammo[0]=WPN[0].ammo; me.mag[0]=WPN[0].mag;
+  me.mag={};
+  for(let i=0;i<WPN.length;i++) me.mag[i]=0;
+  me.mag[0]=WPN[0].mag;
+  bagAdd('ammo9',30); // 初期弾はバッグに入る
   me.rld=null;
   setZoom(false);
   setProne(false);
-}
-function returnAtts(si){
-  const a=me.watt[si];
-  if(a.scope){ if(!bagAdd(a.scope===2?'s2':a.scope===4?'s4':'s8',1)) toast('バッグがいっぱいでスコープを失った…'); a.scope=null; }
-  if(a.noz){ if(!bagAdd('noz',1)) toast('バッグがいっぱいでノズルを失った…'); a.noz=false; }
-  if(a.stk){ if(!bagAdd('stk',1)) toast('バッグがいっぱいでストックを失った…'); a.stk=false; }
 }
 function doReset(){
   me.score=0; foeScore=0; me.hp=100; foe.hp=100; me.cd=0;
@@ -2030,7 +1942,6 @@ function doReset(){
   deathFxs=[];
   if(victoryFx){ scene.remove(victoryFx.m); victoryFx=null; }
   me.bag=[];
-  me.watt={0:{scope:null,noz:false,stk:false},1:{scope:null,noz:false,stk:false}};
   $('bagPanel').style.display='none';
   closeSwap();
   resetLoadout();
@@ -2060,9 +1971,12 @@ function respawnMe(){
   me.yaw=Math.atan2(me.x,me.z); me.hp=100; me.prot=3; me.cd=0;
   me.healT=0; nadeAiming=false; hideTrajectory(); updHealBtn();
   setBall(false); me.ballE=1; kbX=0; kbZ=0; updBallBtn();
-  // やられても武器・アタッチメント・バッグはそのまま(マガジンだけ満タンに)
+  // やられても武器・バッグはそのまま(マガジンは満タン、予備弾ゼロなら少し補充)
   me.rld=null;
-  for(const wid of me.slots) if(wid!==null) me.mag[wid]=Math.max(me.mag[wid],WPN[wid].mag);
+  for(const wid of me.slots) if(wid!==null){
+    me.mag[wid]=Math.max(me.mag[wid],WPN[wid].mag);
+    if(resAmmo(wid)===0) bagAdd(ammoKind(wid),30);
+  }
   setZoom(false); setProne(false);
   me.feetY=groundY(me.x,me.z);
   me.eyeY=me.feetY+EYE;
@@ -2097,7 +2011,7 @@ function hostSpawnBalloon(){
   const id=balloonSeq++;
   let x=0,z=0,y=0;
   for(let tr=0;tr<20;tr++){
-    const ang=Math.random()*6.28, r=4+Math.random()*112;
+    const ang=Math.random()*6.28, r=4+Math.random()*58;
     x=Math.cos(ang)*r; z=Math.sin(ang)*r;
     const h=groundY(x,z);
     y=Math.max(h,WATER_Y)+1.4+Math.random()*2.6;
@@ -2171,33 +2085,12 @@ function hitDummy(dm,dmg,pos){
 
 // 風船10個ごとのごほうび: 武器に自動でアタッチメントが付く
 function grantBalloonReward(){
-  for(const kind of ['noz','stk']){
-    for(const si of [0,1]){
-      if(me.slots[si]!==null && !me.watt[si][kind]){
-        me.watt[si][kind]=true;
-        toast('🎈風船ボーナス!'+WPN[me.slots[si]].name+'に'+(kind==='noz'?'ノズル(連射UP)':'ストック(反動DOWN)')+'が付いた!');
-        sfxPick(); buildViewModel(); updBag();
-        return;
-      }
-    }
-  }
-  for(const si of [0,1]){
-    const wid=me.slots[si];
-    if(wid!==null && scopeFits('s2',wid) && !me.watt[si].scope){
-      const sv=WPN[wid].cls==='snp'?4:2;
-      me.watt[si].scope=sv;
-      toast('🎈風船ボーナス!'+WPN[wid].name+'に'+sv+'倍スコープが付いた!');
-      sfxPick(); buildViewModel(); updBag();
-      return;
-    }
-  }
   if(bagAdd('heal',1)){ toast('🎈風船ボーナス!回復キット +1'); sfxPick(); updBag(); return; }
   for(const si of [0,1]){
     const wid=me.slots[si];
-    if(wid!==null){
-      me.ammo[wid]=Math.min(RES_CAP, me.ammo[wid]+30);
+    if(wid!==null && bagAdd(ammoKind(wid),30)){
       toast('🎈風船ボーナス!'+WPN[wid].cal+'弾 +30');
-      sfxPick(); updSlots();
+      sfxPick(); updSlots(); updBag();
       return;
     }
   }
@@ -2230,7 +2123,7 @@ function updateSmokeClouds(dt){
 
 function deactivateItem(it){
   it.active=false;
-  it.rt = (it.kind==='smoke'||it.kind==='scope8') ? 45 : (it.kind==='scope2'||it.kind==='scope4'||it.kind==='noz'||it.kind==='stk') ? 35 : 20;
+  it.rt = it.kind==='smoke' ? 45 : 20;
   it.g.visible=false;
 }
 function consumeItem(it){
@@ -2240,34 +2133,6 @@ function consumeItem(it){
   deactivateItem(it);
 }
 function bagFullMsg(){ toast('バッグがいっぱい!(8スロット)'); sfxEmpty(); }
-// アタッチメントの自動装着(対応する武器の空き枠へ)
-function autoAttachKind(k){
-  // アクティブな武器を優先、次にもう片方
-  const order = me.sel<2 ? [me.sel, 1-me.sel] : [0,1];
-  if(k==='s2'||k==='s4'||k==='s8'){
-    const want=k==='s2'?2:k==='s4'?4:8;
-    for(const si of order){
-      const wid=me.slots[si];
-      if(wid!==null && scopeFits(k,wid) && !me.watt[si].scope){
-        me.watt[si].scope=want;
-        toast(WPN[wid].name+'に'+want+'倍スコープを自動装着!');
-        buildViewModel(); updBag();
-        return true;
-      }
-    }
-    return false;
-  }
-  for(const si of order){
-    const wid=me.slots[si];
-    if(wid!==null && !me.watt[si][k]){
-      me.watt[si][k]=true;
-      toast(WPN[wid].name+'に'+(k==='noz'?'ノズル(連射UP)':'ストック(反動DOWN)')+'を自動装着!');
-      buildViewModel(); updBag();
-      return true;
-    }
-  }
-  return false;
-}
 // 武器スワップモーダル
 let pendingGun=null;
 function openSwap(it){
@@ -2291,12 +2156,11 @@ function doSwap(si){
   pendingGun=null;
   $('swapModal').style.display='none';
   if(!it || !it.active) return;
-  returnAtts(si);
   if(me.rld===me.slots[si]) me.rld=null;
   me.slots[si]=it.w;
-  me.ammo[it.w]=WPN[it.w].ammo;
   me.mag[it.w]=WPN[it.w].mag;
-  toast(WPN[it.w].name+' に持ち替えた!');
+  const got=bagAdd(ammoKind(it.w), WPN[it.w].ammo);
+  toast(WPN[it.w].name+' に持ち替えた!'+(got>0?'(弾+'+got+')':''));
   if(me.sel===si) buildViewModel(); else updSlots();
   updBag();
   consumeItem(it);
@@ -2310,17 +2174,18 @@ function takeItem(id,mine){
   if(Math.hypot(it.x-me.x, it.z-me.z)>3.6) return;
   if(it.kind==='gun'){
     if(me.slots[0]===it.w || me.slots[1]===it.w){
-      if(me.ammo[it.w]>=WPN[it.w].ammo && me.mag[it.w]>=WPN[it.w].mag){ toast('弾は満タン!'); return; }
-      me.ammo[it.w]=Math.max(me.ammo[it.w], WPN[it.w].ammo);
+      const full=me.mag[it.w]>=WPN[it.w].mag;
+      const got=bagAdd(ammoKind(it.w), WPN[it.w].ammo);
+      if(full && got===0){ toast('弾は満タン!(バッグに空きもない)'); return; }
       me.mag[it.w]=WPN[it.w].mag;
-      toast(WPN[it.w].name+'の弾を補給!');
+      toast(WPN[it.w].name+'の弾を補給!'+(got>0?'(+'+got+')':''));
       updSlots(); consumeItem(it);
     } else if(me.slots[0]===null || me.slots[1]===null){
       const slot=me.slots[0]===null?0:1;
       me.slots[slot]=it.w;
-      me.ammo[it.w]=WPN[it.w].ammo;
       me.mag[it.w]=WPN[it.w].mag;
-      toast(WPN[it.w].name+' を拾った!(スロット'+(slot+1)+')');
+      const got=bagAdd(ammoKind(it.w), WPN[it.w].ammo);
+      toast(WPN[it.w].name+' を拾った!(スロット'+(slot+1)+(got>0?'・弾+'+got:'')+')');
       if(me.sel===slot) buildViewModel(); else updSlots();
       updBag(); consumeItem(it);
     } else {
@@ -2337,25 +2202,11 @@ function takeItem(id,mine){
   } else if(it.kind==='heal'){
     if(!bagAdd('heal',2)){ bagFullMsg(); return; }
     toast('回復キット +2(バッグ)');
-  } else if(it.kind==='ammo5'||it.kind==='ammo7'||it.kind==='ammo9'){
+  } else { // ammo5/ammo7/ammo9
     const cal=it.kind.slice(4)+'mm';
-    let matched=false;
-    for(const s of me.slots){
-      if(s!==null && WPN[s].cal===cal){ me.ammo[s]=Math.min(RES_CAP, me.ammo[s]+60); matched=true; }
-    }
-    if(matched){
-      toast(cal+'弾 +60!');
-    } else {
-      if(!bagAdd(it.kind,60)){ bagFullMsg(); return; }
-      toast(cal+'弾 +60(バッグ)— '+cal+'の武器を拾うと使える');
-    }
-  } else { // scope2/4/8/noz/stk → アクティブ武器→もう片方の順で自動装着。両方装着済みなら拾えない
-    const k=it.kind==='scope2'?'s2':it.kind==='scope4'?'s4':it.kind==='scope8'?'s8':it.kind;
-    if(!autoAttachKind(k)){
-      toast('装着できる武器がない(装着済み or 非対応)');
-      sfxEmpty();
-      return;
-    }
+    const got=bagAdd(it.kind,60);
+    if(!got){ bagFullMsg(); return; }
+    toast(cal+'弾 +'+got+'(バッグ)');
   }
   updSlots(); updBag(); consumeItem(it);
 }
@@ -2479,7 +2330,7 @@ function thumbAimTarget(){
 let emptyToastT=0;
 function startReload(wi){
   if(me.rld!==null || me.healT>0 || me.stow || me.ball) return;
-  if(me.mag[wi]>=WPN[wi].mag || me.ammo[wi]<=0) return;
+  if(me.mag[wi]>=WPN[wi].mag || resAmmo(wi)<=0) return;
   me.rld=wi;
   me.cd=Math.max(me.cd, WPN[wi].rel);
   sfxReload();
@@ -2560,25 +2411,25 @@ function fire(){
   const wi=me.slots[me.sel];
   if(wi===null || me.cd>0) return;
   if(me.mag[wi]<=0){
-    if(me.ammo[wi]>0){ startReload(wi); return; }
+    if(resAmmo(wi)>0){ startReload(wi); return; }
     me.cd=0.3;
     sfxEmpty();
     const now=performance.now();
     if(now-emptyToastT>1500){ emptyToastT=now; toast('弾切れ!黄色い光の柱で補給しよう'); }
     return;
   }
-  const w=WPN[wi], wa=me.watt[me.sel];
-  me.cd=w.cd*(wa.noz?0.72:1); me.prot=0; gunKick=1;
+  const w=WPN[wi];
+  me.cd=w.cd; me.prot=0; gunKick=1;
   me.mag[wi]--;
-  if(me.mag[wi]===0 && me.ammo[wi]>0) startReload(wi);
+  if(me.mag[wi]===0 && resAmmo(wi)>0) startReload(wi);
   updSlots();
   const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
   const spr=w.spread*(me.zoom?(zoomX()>=2?0.35:0.6):1);
   dir.x+=(Math.random()-0.5)*spr*2; dir.y+=(Math.random()-0.5)*spr*2; dir.z+=(Math.random()-0.5)*spr*2;
   dir.normalize();
   applyAimAssist(dir);
-  // 反動(ストック装着・匍匐・覗き込みで軽減)
-  const rec=w.recoil*(wa.stk?0.45:1)*(me.prone?0.55:1)*(me.zoom?0.85:1);
+  // 反動(匍匐・覗き込みで軽減)
+  const rec=w.recoil*(me.prone?0.55:1)*(me.zoom?0.85:1);
   me.pitch=clamp(me.pitch+rec,-1.15,1.15);
   me.yaw+=(Math.random()-0.5)*rec*0.6;
   const origin=camera.position.clone().add(dir.clone().multiplyScalar(0.7)); origin.y-=0.12;
@@ -2894,9 +2745,10 @@ function loop(t){
   me.cd=Math.max(0,me.cd-dt); me.prot=Math.max(0,me.prot-dt); foe.prot=Math.max(0,foe.prot-dt);
   if(me.rld!==null && me.cd<=0){
     const rwi=me.rld;
-    const take=Math.min(WPN[rwi].mag-me.mag[rwi], me.ammo[rwi]);
-    me.mag[rwi]+=take; me.ammo[rwi]-=take;
+    const take=Math.min(WPN[rwi].mag-me.mag[rwi], resAmmo(rwi));
+    me.mag[rwi]+=take; bagConsume(ammoKind(rwi),take);
     me.rld=null; updSlots();
+    if($('bagPanel').style.display==='flex') updBag();
   }
   hurtT=Math.max(0,hurtT-dt); hitT=Math.max(0,hitT-dt); msgT=Math.max(0,msgT-dt);
   // HP自動回復: ダメージを受けず5秒たつと毎秒5ずつ回復
@@ -2951,6 +2803,7 @@ function loop(t){
     // スティックを倒し切るとダッシュ、少し倒すと歩き
     const stickMag=Math.min(1, Math.hypot(f,s));
     const dash = stickMag>0.9;
+    dashT+=(((dash&&!me.zoom)?1:0)-dashT)*Math.min(1,dt*5);
     // 覗き込み中はクラス別に移動が遅くなる(SMG>AR>スナイパー)
     let adsMul=1;
     if(me.zoom && me.sel<2 && me.slots[me.sel]!==null){
@@ -2960,8 +2813,8 @@ function loop(t){
     const healMul = me.healT>0 ? 0.4 : 1;
     const stowMul = (me.stow && me.sel<2) ? 1.25 : 1; // 素手なら少し速い
     // ボール中はいつでも高速で転がれる
-    const SP = me.ball ? (wading ? 3.4 : 6.2)
-             : (wading ? 1.8 : (dash ? 4.2 : 2.4))*(me.prone?0.35:1)*adsMul*healMul*stowMul;
+    const SP = me.ball ? (wading ? 4.2 : 8.0)
+             : (wading ? 2.4 : (dash ? 6.0 : 3.4))*(me.prone?0.35:1)*adsMul*healMul*stowMul;
     let nx=me.x+(-Math.sin(me.yaw)*f+Math.cos(me.yaw)*s)*SP*dt;
     let nz=me.z+(-Math.cos(me.yaw)*f-Math.sin(me.yaw)*s)*SP*dt;
     // 体当たりのノックバック
@@ -3071,7 +2924,7 @@ function loop(t){
 
   camera.position.set(me.x, me.eyeY+Math.abs(Math.sin(bobPhase))*0.05*walkAmp*(me.prone?0.35:me.ball?1.7:1), me.z);
   camera.rotation.set(me.pitch, me.yaw, 0);
-  const fovT = me.zoom ? 72/zoomX() : (me.ball?84:72);
+  const fovT = me.zoom ? 72/zoomX() : (me.ball?86:72+dashT*7);
   if(Math.abs(camera.fov-fovT)>0.05){
     camera.fov+=(fovT-camera.fov)*Math.min(1,dt*12);
     camera.updateProjectionMatrix();
