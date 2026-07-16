@@ -106,6 +106,8 @@
   #cross.lock { transform:translate(-50%,-50%) scale(1.3); }
   #ballOv { display:none; position:absolute; inset:0; z-index:9; pointer-events:none;
     background:radial-gradient(circle at center, transparent 42%, rgba(140,200,255,0.16) 72%, rgba(100,170,240,0.38) 100%); }
+  #ghostOv { display:none; position:absolute; inset:0; z-index:9; pointer-events:none;
+    background:radial-gradient(circle at center, transparent 50%, rgba(230,240,255,0.3) 100%); }
   #scopeOv { display:none; position:absolute; inset:0; z-index:9; pointer-events:none;
     background:radial-gradient(circle at center, transparent 30%, rgba(5,8,12,0.92) 42%); }
   #bagPanel { display:none; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -265,6 +267,7 @@
   <div id="moveHint">画面の左側をタッチ→いどう</div>
   <div id="aimHint">画面の右側をタッチ→しせん</div>
   <div id="ballOv"></div>
+  <div id="ghostOv"></div>
   <button id="adsBtn">のぞく</button>
   <button id="fireBtn2">うつ</button>
   <button id="bagBtn">バッグ</button>
@@ -282,6 +285,7 @@
   <div id="throwMenu">
     <button class="tOpt" id="tOptN">グレネード ×0</button>
     <button class="tOpt" id="tOptS">煙玉 ×0</button>
+    <button class="tOpt" id="tOptM">地雷 ×0</button>
   </div>
   <div id="bagPanel">
     <h3>アイテムバッグ</h3>
@@ -401,8 +405,8 @@ const WPN=[
 ];
 const ammoKind=wid=>'ammo'+WPN[wid].cal[0]; // 予備弾はバッグのスタックで持つ
 const resAmmo=wid=>bagCount(ammoKind(wid));
-const ITEM_LBL={nade:'グレネード',ammo5:'5mm弾',ammo7:'7mm弾',ammo9:'9mm弾',smoke:'煙玉',heal:'回復キット'};
-const STACK_CAP={ammo5:60,ammo7:60,ammo9:60,nade:2,smoke:2,heal:4};
+const ITEM_LBL={nade:'グレネード',ammo5:'5mm弾',ammo7:'7mm弾',ammo9:'9mm弾',smoke:'煙玉',heal:'回復キット',mine:'地雷',slow:'スロー玉',ghost:'とうめい玉',radar:'レーダー'};
+const STACK_CAP={ammo5:60,ammo7:60,ammo9:60,nade:2,smoke:2,heal:4,mine:3};
 const BAG_SLOTS=8;
 const NADE_COL=0xe24b4a, AMMO_COL=0xffd166, NADE_MAX=4, SMOKE_MAX=2;
 const BALLOON_COLS=[0xe84b4a,0xffd166,0x5ad0a5,0x5aa5e8,0xf096b4,0xb78ae8];
@@ -410,7 +414,7 @@ let SPAWNS=[[-42,-42],[42,-42],[-42,42],[42,42]];
 let heightFn=null, obstacles=[], items=[];
 let scene,camera,renderer,foeMesh,gunGroup,muzzle,waterMesh;
 const me={x:-24,z:-24,yaw:0,pitch:0,hp:100,score:0,cd:0,prot:0,slots:[0,null],sel:0,
-  mag:{}, rld:null,feetY:0,eyeY:0,vy:0,air:false,zoom:false,prone:false,healT:0,stow:false,ball:false,ballE:1,
+  mag:{}, rld:null,feetY:0,eyeY:0,vy:0,air:false,zoom:false,prone:false,healT:0,stow:false,ball:false,ballE:1,slowT:0,invisT:0,radarT:0,
   bag:[]};
 // バッグ(8スロット・スタック制)
 function bagCount(k){ let n=0; for(const s of me.bag) if(s.k===k) n+=s.n; return n; }
@@ -438,7 +442,7 @@ function bagConsume(k,n){
   }
   return n-left;
 }
-const foe={x:24,z:24,tx:24,tz:24,a:0,ta:0,hp:100,prot:0,prone:false,pr:0,fy:0,tfy:0,ball:false};
+const foe={x:24,z:24,tx:24,tz:24,a:0,ta:0,hp:100,prot:0,prone:false,pr:0,fy:0,tfy:0,ball:false,invis:false};
 let platforms=[], factorySite=null, mansionSite=null;
 let foeScore=0, projectiles=[], nadesArr=[], puffs=[], gunKick=0, hurtT=0, hitT=0, msgT=0;
 let pFoeX=null, pFoeZ=null, foeStepAcc=0, myStepAcc=0, bobPhase=0, walkAmp=0, adsT=0, regenWait=0;
@@ -446,6 +450,7 @@ let balloons=new Map(), balloonSeq=0, balloonTimer=0.5, myBalloons=0, foeBalloon
 let training=false, dummies=[], dmgNums=[];
 let deathFxs=[], victoryFx=null;
 let foeBall=null, ramCd=0, kbX=0, kbZ=0, lockPrev=false, lastBallP=-1, dashT=0;
+let minesArr=[], mineSeq=0, radarSpr=null;
 
 // ---------------- 質感テクスチャ ----------------
 let _groundTex=null, _furTex=null, _barkTex=null;
@@ -524,8 +529,8 @@ function makeLabelSprite(text,colHex){
 // アイテムの見た目(ビーム+モデル+ラベル)を作る(全マップ共通)
 function makeItemGroup(kind,w){
   const col = kind==='gun'?WPN[w].col : kind==='nade'?NADE_COL :
-    kind==='smoke'?0x9aa0b0 : kind==='scope2'?0x8ad0f0 : kind==='scope4'?0xb78ae8 : kind==='scope8'?0xf0d060 :
-    kind==='noz'?0xff9a3c : kind==='stk'?0xc08a50 : kind==='heal'?0x7ae87a :
+    kind==='smoke'?0x9aa0b0 : kind==='mine'?0xff6a4a : kind==='slow'?0x6ac4ff :
+    kind==='ghost'?0xe8f0ff : kind==='radar'?0x8affc8 : kind==='heal'?0x7ae87a :
     kind==='ammo5'?0xffd166 : kind==='ammo7'?0xff8a5a : kind==='ammo9'?0xd0d6de : AMMO_COL;
   const g=new THREE.Group();
   const bh=mapSel===1?6:26;
@@ -581,6 +586,30 @@ function makeItemGroup(kind,w){
     const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x788088}));
     const band=new THREE.Mesh(new THREE.CylinderGeometry(0.245,0.245,0.08,10,1,true), new THREE.MeshLambertMaterial({color:0xe8e8e8}));
     obj.add(b,band);
+  } else if(kind==='mine'){
+    const b=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.28,0.1,10), new THREE.MeshLambertMaterial({color:0x3a3f35}));
+    const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,5), new THREE.MeshBasicMaterial({color:0xff4a3a}));
+    lamp.position.y=0.1;
+    obj.add(b,lamp);
+  } else if(kind==='slow'){
+    const c1=new THREE.Mesh(new THREE.ConeGeometry(0.16,0.2,8), new THREE.MeshLambertMaterial({color:0x6ac4ff, transparent:true, opacity:0.85}));
+    c1.position.y=0.12;
+    const c2=c1.clone(); c2.rotation.x=Math.PI; c2.position.y=-0.12;
+    const sand=new THREE.Mesh(new THREE.SphereGeometry(0.07,7,6), new THREE.MeshLambertMaterial({color:0xffd166}));
+    obj.add(c1,c2,sand);
+  } else if(kind==='ghost'){
+    const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,10,8), new THREE.MeshLambertMaterial({color:0xf2f6ff, transparent:true, opacity:0.4}));
+    for(const sx of[-1,1]){
+      const eye=new THREE.Mesh(new THREE.SphereGeometry(0.04,6,5), new THREE.MeshBasicMaterial({color:0x22262e}));
+      eye.position.set(0.08*sx,0.05,0.2); obj.add(eye);
+    }
+    obj.add(b);
+  } else if(kind==='radar'){
+    const dish=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.2,0.12,10), new THREE.MeshLambertMaterial({color:0x8affc8}));
+    dish.rotation.z=0.7; dish.position.y=0.12;
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.26,6), new THREE.MeshLambertMaterial({color:0x666e78}));
+    pole.position.y=-0.08;
+    obj.add(dish,pole);
   } else if(kind==='scope2'||kind==='scope4'||kind==='scope8'){
     const tube=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.12,0.5,8), new THREE.MeshLambertMaterial({color:0x2c313c}));
     tube.rotation.z=Math.PI/2;
@@ -1268,6 +1297,10 @@ function buildWorld(rng){
   for(let i=0;i<3;i++) addItem(id++,'ammo9',0);
   for(let i=0;i<5;i++) addItem(id++,'heal',0);
   for(let i=0;i<3;i++) addItem(id++,'smoke',0);
+  for(let i=0;i<2;i++) addItem(id++,'mine',0);
+  addItem(id++,'slow',0);
+  addItem(id++,'ghost',0);
+  addItem(id++,'radar',0);
 
   foeMesh=hamModel(!isHost);
   scene.add(foeMesh);
@@ -1463,6 +1496,10 @@ function buildWorldIndoor(rng){
   for(let i=0;i<3;i++) addIndoorItem('ammo9',0);
   for(let i=0;i<6;i++) addIndoorItem('heal',0);
   for(let i=0;i<3;i++) addIndoorItem('smoke',0);
+  for(let i=0;i<3;i++) addIndoorItem('mine',0);
+  addIndoorItem('slow',0);
+  addIndoorItem('ghost',0);
+  addIndoorItem('radar',0);
 
   foeMesh=hamModel(!isHost);
   scene.add(foeMesh);
@@ -1717,6 +1754,16 @@ function buildViewModel(){
     updSlots();
     return;
   }
+  if(me.sel===4){ // 地雷: 手のひらの円盤
+    const b=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.08,0.028,10), new THREE.MeshLambertMaterial({color:0x3a3f35}));
+    const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.018,6,5), new THREE.MeshBasicMaterial({color:0xff4a3a}));
+    lamp.position.y=0.03;
+    p1.position.set(-0.04,-0.05,0.03); p2.position.set(0.05,-0.04,0.02);
+    gunGroup.add(b,lamp,p1,p2);
+    gunGroup.position.set(0.3,-0.28,-0.55);
+    updSlots();
+    return;
+  }
   if(me.sel===2 || me.sel===3){
     const smoke=me.sel===3;
     const b=new THREE.Mesh(new THREE.SphereGeometry(0.07,8,7),
@@ -1777,13 +1824,14 @@ function updSlots(){
   const s0=$('slot0'), s1=$('slot1'), tb=$('throwBtn');
   s0.innerHTML = slotLabel(0);
   s1.innerHTML = slotLabel(1);
-  const nN=bagCount('nade'), nS=bagCount('smoke');
+  const nN=bagCount('nade'), nS=bagCount('smoke'), nM=bagCount('mine');
   tb.innerHTML = me.sel===2 ? 'グレネード<br>×'+nN
                : me.sel===3 ? '煙玉<br>×'+nS
-               : '投げ物<br>💣'+nN+' 💨'+nS;
+               : me.sel===4 ? '地雷<br>×'+nM
+               : '投げ物<br>💣'+nN+' 💨'+nS+' 💥'+nM;
   s0.classList.toggle('empty', me.slots[0]===null || (me.mag[me.slots[0]]===0&&resAmmo(me.slots[0])===0));
   s1.classList.toggle('empty', me.slots[1]===null || (me.mag[me.slots[1]]===0&&resAmmo(me.slots[1])===0));
-  tb.classList.toggle('empty', nN===0 && nS===0);
+  tb.classList.toggle('empty', nN===0 && nS===0 && nM===0);
   s0.classList.toggle('sel', me.sel===0 && !me.stow);
   s1.classList.toggle('sel', me.sel===1 && !me.stow);
   tb.classList.toggle('sel', me.sel>=2);
@@ -1791,7 +1839,7 @@ function updSlots(){
     $('ammoCnt').textContent='収納中';
     $('ammoCnt').style.color='#9aa0b0';
   } else if(me.sel>=2){
-    const cnt = me.sel===2 ? bagCount('nade') : bagCount('smoke');
+    const cnt = me.sel===2 ? bagCount('nade') : me.sel===3 ? bagCount('smoke') : bagCount('mine');
     $('ammoCnt').textContent='×'+cnt;
     $('ammoCnt').style.color = cnt===0 ? '#f09595' : '#ffd98a';
   } else {
@@ -1811,6 +1859,7 @@ function selectSlot(i){
   if(me.healT>0) return; // 回復中は持ち替え不可
   if(i===2){ if(bagCount('nade')<=0&&me.sel!==2) return; }
   else if(i===3){ if(bagCount('smoke')<=0&&me.sel!==3) return; }
+  else if(i===4){ if(bagCount('mine')<=0&&me.sel!==4) return; }
   else if(me.slots[i]===null) return;
   $('throwMenu').style.display='none';
   if(me.sel===i){
@@ -1837,9 +1886,10 @@ function toggleThrowMenu(show){
   const m=$('throwMenu');
   const on = show===undefined ? m.style.display!=='flex' : show;
   if(on){
-    const nN=bagCount('nade'), nS=bagCount('smoke');
+    const nN=bagCount('nade'), nS=bagCount('smoke'), nM=bagCount('mine');
     $('tOptN').textContent='グレネード ×'+nN; $('tOptN').disabled=nN<=0;
     $('tOptS').textContent='煙玉 ×'+nS; $('tOptS').disabled=nS<=0;
+    $('tOptM').textContent='地雷 ×'+nM; $('tOptM').disabled=nM<=0;
     m.style.display='flex';
   } else m.style.display='none';
 }
@@ -1849,6 +1899,8 @@ $('tOptN').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropaga
 $('tOptN').addEventListener('mousedown',  e=>{ e.stopPropagation(); selectSlot(2); });
 $('tOptS').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); selectSlot(3); },{passive:false});
 $('tOptS').addEventListener('mousedown',  e=>{ e.stopPropagation(); selectSlot(3); });
+$('tOptM').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); selectSlot(4); },{passive:false});
+$('tOptM').addEventListener('mousedown',  e=>{ e.stopPropagation(); selectSlot(4); });
 $('adsBtn').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); setZoom(!me.zoom); },{passive:false});
 $('adsBtn').addEventListener('mousedown',  e=>{ e.stopPropagation(); setZoom(!me.zoom); });
 
@@ -1979,7 +2031,8 @@ function updBag(){
     ammo9:{ic:'📦',nm:'9mm弾',act:'捨てる'},
     nade:{ic:'💣',nm:'グレネード',act:''},
     smoke:{ic:'💨',nm:'煙玉',act:''},
-    heal:{ic:'💊',nm:'回復キット',act:'+20'}
+    heal:{ic:'💊',nm:'回復キット',act:'+20'},
+    mine:{ic:'💥',nm:'地雷',act:''}
   };
   for(let i=0;i<BAG_SLOTS;i++){
     const st=me.bag[i];
@@ -2069,7 +2122,7 @@ function updatePickChips(){
 function onData(d){
   switch(d.t){
     case 'init': seed=d.seed; mapSel=d.map||0; startGame(); break;
-    case 'pos': foe.tx=d.x; foe.tz=d.z; foe.ta=d.a; foe.prone=!!d.p; foe.ball=!!d.b;
+    case 'pos': foe.tx=d.x; foe.tz=d.z; foe.ta=d.a; foe.prone=!!d.p; foe.ball=!!d.b; foe.invis=!!d.i;
       foe.tfy=(typeof d.y==='number')?d.y:groundY(d.x,d.z); break;
     case 'shot': spawnProjectile(new THREE.Vector3(d.x,d.y,d.z), new THREE.Vector3(d.dx,d.dy,d.dz), d.w, false); sfxShot(d.w, volAt(d.x,d.z,50)*0.85); break;
     case 'nade': spawnNade(new THREE.Vector3(d.x,d.y,d.z), new THREE.Vector3(d.dx,d.dy,d.dz), false, false); sfxThrow(); break;
@@ -2086,6 +2139,9 @@ function onData(d){
       if(me.score>=KILL_WIN) gameOver(true);
       break;
     case 'pick': takeItem(d.id,false); break;
+    case 'mine': spawnMine(d.id,d.x,d.y,d.z,false); sfxPlant(); break;
+    case 'boom': mineBoom(d.id); break;
+    case 'slow': me.slowT=d.d||6; toast('⏳スロー玉をくらった!動きがおそくなる'); sfxHurt(); updBars(); break;
     case 'restart': doReset(); break;
   }
 }
@@ -2109,6 +2165,11 @@ function startGame(){
   renderer.setSize(innerWidth,innerHeight);
   $('gameWrap').insertBefore(renderer.domElement, $('touchLayer'));
   if(mapSel===1) buildWorldIndoor(rng); else buildWorld(rng);
+  radarSpr=makeLabelSprite('📡ここ!','#ff5a4a');
+  radarSpr.scale.set(2.0,0.5,1);
+  radarSpr.material.depthTest=false;
+  radarSpr.visible=false;
+  scene.add(radarSpr);
   doReset();
   if(training){
     foeMesh.visible=false;
@@ -2118,7 +2179,7 @@ function startGame(){
   }
   try{ document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }catch(e){}
   addEventListener('resize', onResize);
-  setInterval(()=>{ if(state==='playing') send({t:'pos',x:me.x,z:me.z,a:me.yaw,p:me.prone?1:0,y:me.feetY,b:me.ball?1:0}); },50);
+  setInterval(()=>{ if(state==='playing') send({t:'pos',x:me.x,z:me.z,a:me.yaw,p:me.prone?1:0,y:me.feetY,b:me.ball?1:0,i:me.invisT>0?1:0}); },50);
   last=performance.now();
   requestAnimationFrame(loop);
 }
@@ -2161,6 +2222,9 @@ function doReset(){
   projectiles=[]; nadesArr=[];
   me.healT=0; nadeAiming=false; hideTrajectory();
   setBall(false); me.ballE=1; kbX=0; kbZ=0; ramCd=0; lastBallP=-1; updBallBtn();
+  me.slowT=0; me.invisT=0; me.radarT=0; $('ghostOv').style.display='none';
+  for(const mn of minesArr) scene.remove(mn.g);
+  minesArr=[];
   buildViewModel(); updBars(); updScore(); setMsg('');
   $('overlay').style.display='none';
   state='playing';
@@ -2173,6 +2237,7 @@ function respawnMe(){
   me.yaw=Math.atan2(me.x,me.z); me.hp=100; me.prot=3; me.cd=0;
   me.healT=0; nadeAiming=false; hideTrajectory(); updHealBtn();
   setBall(false); me.ballE=1; kbX=0; kbZ=0; updBallBtn();
+  me.slowT=0; me.invisT=0; me.radarT=0; $('ghostOv').style.display='none'; updBars();
   // やられても武器・バッグはそのまま(マガジンは満タン、予備弾ゼロなら少し補充)
   me.rld=null;
   for(const wid of me.slots) if(wid!==null){
@@ -2329,7 +2394,7 @@ function updateSmokeClouds(dt){
 
 function deactivateItem(it){
   it.active=false;
-  it.rt = it.kind==='smoke' ? 45 : 20;
+  it.rt = (it.kind==='slow'||it.kind==='ghost'||it.kind==='radar') ? 55 : (it.kind==='smoke'||it.kind==='mine') ? 45 : 20;
   it.g.visible=false;
 }
 function consumeItem(it){
@@ -2402,6 +2467,20 @@ function takeItem(id,mine){
   if(it.kind==='nade'){
     if(!bagAdd('nade',2)){ bagFullMsg(); return; }
     toast('グレネード +2(バッグ)');
+  } else if(it.kind==='mine'){
+    if(!bagAdd('mine',2)){ bagFullMsg(); return; }
+    toast('💥地雷 +2(投げ物ボタンから装備)');
+  } else if(it.kind==='slow'){
+    send({t:'slow', d:6});
+    toast('⏳スロー玉!相手の動きが6秒おそくなる!');
+  } else if(it.kind==='ghost'){
+    me.invisT=6;
+    $('ghostOv').style.display='block';
+    toast('👻とうめい!6秒間すがたが消える(うつは使えない)');
+    updBars();
+  } else if(it.kind==='radar'){
+    me.radarT=12;
+    toast('📡レーダー!12秒間相手の場所が見える!');
   } else if(it.kind==='smoke'){
     if(!bagAdd('smoke',1)){ bagFullMsg(); return; }
     toast('レア!煙玉 +1(バッグ)');
@@ -2416,6 +2495,59 @@ function takeItem(id,mine){
   }
   updSlots(); updBag(); consumeItem(it);
 }
+
+// ---------------- 地雷 ----------------
+function spawnMine(id,x,y,z,mine){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.3,0.09,10), new THREE.MeshLambertMaterial({color:0x3a3f35}));
+  body.position.y=0.045; g.add(body);
+  const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,5), new THREE.MeshBasicMaterial({color:0x666666}));
+  lamp.position.y=0.11; g.add(lamp);
+  if(mine){ // 自分の地雷は赤いリングで場所がわかる(壁越しにも見える)
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(0.45,0.035,6,20),
+      new THREE.MeshBasicMaterial({color:0xff4a3a, transparent:true, opacity:0.8, depthTest:false, depthWrite:false}));
+    ring.rotation.x=-Math.PI/2; ring.position.y=0.07; g.add(ring);
+  }
+  g.position.set(x,y,z);
+  scene.add(g);
+  minesArr.push({id,x,y,z,mine,t:0,g,lamp});
+}
+function plantMine(){
+  if(bagCount('mine')<=0 || me.cd>0) return;
+  me.cd=0.8; bagConsume('mine',1); me.prot=0; gunKick=1;
+  const id=(isHost?'h':'g')+(mineSeq++);
+  spawnMine(id, me.x, me.feetY, me.z, true);
+  send({t:'mine', id, x:me.x, y:me.feetY, z:me.z});
+  sfxPlant(); updSlots(); updBag();
+  toast('💥地雷を設置!3秒後に作動(自分がふんでも爆発!)');
+  if(navigator.vibrate) navigator.vibrate(15);
+  if(bagCount('mine')===0){ me.sel=0; buildViewModel(); }
+}
+function mineBoom(id){
+  const i=minesArr.findIndex(m=>m.id===id);
+  if(i<0) return;
+  const mn=minesArr[i];
+  scene.remove(mn.g);
+  minesArr.splice(i,1);
+  explode(new THREE.Vector3(mn.x,mn.y+0.3,mn.z), false);
+}
+function updateMines(dt){
+  for(const mn of minesArr){
+    mn.t+=dt;
+    if(mn.t>3) mn.lamp.material.color.setHex((mn.t%0.8)<0.4?0xff3a2a:0x551f1a); // 作動中は点滅
+  }
+  if(state!=='playing' || me.prot>0) return;
+  for(const mn of minesArr){
+    if(mn.t<=3) continue; // 設置から3秒は作動しない
+    if(Math.hypot(me.x-mn.x, me.z-mn.z)<0.62 && Math.abs(me.feetY-mn.y)<0.7){
+      send({t:'boom', id:mn.id});
+      setMsg('💥地雷をふんだ!');
+      mineBoom(mn.id);
+      break;
+    }
+  }
+}
+function sfxPlant(){ if(!audioInit())return; tone({f:520,f2:380,dur:0.08,vol:0.2,type:'square'}); tone({f:900,dur:0.05,vol:0.15,type:'square',at:0.1}); }
 
 // ---------------- 弾・グレネード ----------------
 function spawnProjectile(origin,dir,w,mine){
@@ -2467,7 +2599,7 @@ function explode(pos,mine){
 // エイムアシスト: 狙いが敵の近く(約5度以内)なら弾がゆるく吸い付く
 function applyAimAssist(dir){
   const targets=[];
-  if(!training) targets.push({x:foe.x, y:foe.fy+(foe.prone?0.35:0.8), z:foe.z});
+  if(!training){ if(foeMesh && foeMesh.visible) targets.push({x:foe.x, y:foe.fy+(foe.prone?0.35:0.8), z:foe.z}); }
   else for(const dm of dummies) if(dm.hp>0) targets.push({x:dm.x, y:groundY(dm.x,dm.z)+0.8, z:dm.z});
   let best=null, bestA=0.09;
   for(const tg of targets){
@@ -2608,6 +2740,12 @@ function doThrow(){
 }
 function fire(){
   if(me.healT>0 || me.ball) return; // 回復中・ボール中は撃てない
+  if(me.invisT>0){
+    const now=performance.now();
+    if(now-emptyToastT>1500){ emptyToastT=now; toast('👻とうめい中は「うつ」アクションが使えない'); }
+    return;
+  }
+  if(me.sel===4){ plantMine(); return; }
   if(me.stow && me.sel<2){
     const now=performance.now();
     if(now-emptyToastT>1500){ emptyToastT=now; toast('武器を収納中!スロットをタップして取り出そう'); }
@@ -2906,6 +3044,7 @@ const keys={};
 addEventListener('keydown', e=>{ keys[e.code]=true;
   if(e.code==='Digit1')selectSlot(0); if(e.code==='Digit2')selectSlot(1);
   if(e.code==='Digit3')selectSlot(2); if(e.code==='Digit4')selectSlot(3);
+  if(e.code==='Digit5')selectSlot(4);
   if(e.code==='KeyQ')setZoom(!me.zoom);
   if(e.code==='KeyC')setProne(!me.prone);
   if(e.code==='KeyR'&&me.sel<2&&me.slots[me.sel]!==null)startReload(me.slots[me.sel]);
@@ -2935,7 +3074,7 @@ function updBars(){
   const r=Math.max(0,me.hp)/100, el=$('myHp');
   el.style.width=(r*100)+'%';
   el.style.background=r>0.6?'#639922':r>0.3?'#EF9F27':'#E24B4A';
-  $('hpLabel').textContent='あなた HP'+Math.max(0,Math.round(me.hp))+(me.prot>0?'(保護中)':'')+(me.prone?'・匍匐中':'')+(me.ball?'・🐹ボール!':'');
+  $('hpLabel').textContent='あなた HP'+Math.max(0,Math.round(me.hp))+(me.prot>0?'(保護中)':'')+(me.prone?'・匍匐中':'')+(me.ball?'・🐹ボール!':'')+(me.invisT>0?'・👻とうめい':'')+(me.slowT>0?'・⏳スロー':'');
 }
 function updScore(){ $('score').textContent='🎈'+myBalloons+'-'+foeBalloons+'  💥'+me.score+'-'+foeScore; }
 function setMsg(s){ $('msg').textContent=s; msgT=1.8; }
@@ -3018,10 +3157,11 @@ function loop(t){
       adsMul = c==='snp'?0.3 : c==='ar'?0.55 : c==='smg'?0.8 : 0.7;
     }
     const healMul = me.healT>0 ? 0.4 : 1;
+    const slowMul = me.slowT>0 ? 0.5 : 1; // ⏳スロー玉をくらうと半減
     const stowMul = (me.stow && me.sel<2) ? 1.25 : 1; // 素手なら少し速い
     // ボール中はいつでも高速で転がれる
-    const SP = me.ball ? (wading ? 5.0 : 9.6)
-             : (wading ? 3.0 : (dash ? 7.6 : 4.4))*(me.prone?0.35:1)*adsMul*healMul*stowMul;
+    const SP = (me.ball ? (wading ? 5.0 : 9.6)
+             : (wading ? 3.0 : (dash ? 7.6 : 4.4))*(me.prone?0.35:1)*adsMul*healMul*stowMul)*slowMul;
     let nx=me.x+(-Math.sin(me.yaw)*f+Math.cos(me.yaw)*s)*SP*dt;
     let nz=me.z+(-Math.cos(me.yaw)*f-Math.sin(me.yaw)*s)*SP*dt;
     // 体当たりのノックバック
@@ -3063,7 +3203,7 @@ function loop(t){
     const wantFire = firing||keys['KeyF'];
     // 投げ物は「うつ」ボタン長押しで軌道表示、離した瞬間に投げる
     const nadeHold = wantFire;
-    if(me.sel>=2 && me.healT<=0 && !me.ball){
+    if((me.sel===2||me.sel===3) && me.healT<=0 && !me.ball){
       // 投げ物: 押している間は軌道を表示、離すとその軌道どおりに投げる
       const kind = me.sel===2?'nade':'smoke';
       if(nadeHold && bagCount(kind)>0 && me.cd<=0){
@@ -3097,7 +3237,7 @@ function loop(t){
     }
     // オートショット & 照準ロック表示
     let lockOn=false;
-    if(me.sel<2 && !me.stow && !me.ball && me.healT<=0 && me.slots[me.sel]!==null
+    if(me.sel<2 && !me.stow && !me.ball && me.healT<=0 && me.invisT<=0 && me.slots[me.sel]!==null
        && $('bagPanel').style.display!=='flex'){
       const tgt=autoTargetVec();
       lockOn=!!tgt;
@@ -3222,7 +3362,7 @@ function loop(t){
   foeMesh.rotation.y=foe.a+Math.PI+(ud.rel||0)*(1-foe.pr);
   foeMesh.rotation.z=Math.sin(ud.phase)*0.05*ud.amp*(1-foe.pr)-Math.sin(ud.rel||0)*0.08*ud.amp*(1-foe.pr);
   foeMesh.rotation.x=-0.9*foe.pr;
-  foeMesh.visible = training ? false : (foe.prot>0 ? ((t/140|0)%2===0) : true);
+  foeMesh.visible = training ? false : foe.invis ? false : (foe.prot>0 ? ((t/140|0)%2===0) : true);
   // 相手のハムスターボール表示(中でハムスターがくるくる回る)
   if(foe.ball){
     ud.roll=(ud.roll||0)+fsp*dt/0.9;
@@ -3270,6 +3410,17 @@ function loop(t){
     b.g.rotation.z=Math.sin(b.ph*0.9)*0.08;
   }
   updateSmokeClouds(dt);
+  updateMines(dt);
+  // 一時効果のタイマー
+  if(me.slowT>0){ me.slowT-=dt; if(me.slowT<=0){ me.slowT=0; toast('スローが解除された!'); updBars(); } }
+  if(me.invisT>0){ me.invisT-=dt; if(me.invisT<=0){ me.invisT=0; $('ghostOv').style.display='none'; toast('とうめい終了'); updBars(); } }
+  if(me.radarT>0) me.radarT-=dt;
+  // レーダー: 相手の位置マーカー(壁越しにも見える)
+  if(radarSpr){
+    const on = me.radarT>0 && !training && state==='playing';
+    radarSpr.visible=on;
+    if(on) radarSpr.position.set(foe.x, foe.fy+2.3, foe.z);
+  }
   updatePickChips();
 
   updateProjectiles(dt);
