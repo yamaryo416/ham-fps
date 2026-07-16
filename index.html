@@ -141,7 +141,7 @@
   #swapRows { display:flex; flex-direction:column; gap:7px; }
   #swapCancel { font-family:inherit; font-weight:700; font-size:13px; color:#9aa0b0; background:transparent;
     border:1.5px solid #3a3f4e; border-radius:10px; padding:9px; }
-  #fireBtn { position:absolute; right:calc(20px + env(safe-area-inset-right)); bottom:calc(190px + env(safe-area-inset-bottom));
+  #fireBtn { position:absolute; right:calc(104px + env(safe-area-inset-right)); bottom:calc(150px + env(safe-area-inset-bottom));
     width:86px; height:86px; border-radius:50%; background:rgba(226,75,74,0.32); border:2.5px solid rgba(240,149,149,0.75);
     color:rgba(255,255,255,0.92); font-family:inherit; font-weight:700; font-size:15px; z-index:21; touch-action:none; }
   #fireBtn.on { background:rgba(226,75,74,0.62); }
@@ -840,6 +840,7 @@ function buildWorld(rng){
       for(const [ox,oz] of [[4,-2.5],[6,1.5],[8.5,-4]]){
         box(1.4,1.4,1.4, ox,0.77,oz, crateM);
         obstacles.push({x:cx+ox, z:cz+oz, rr:1.0, top:base+1.5});
+        platforms.push({x0:cx+ox-0.7,x1:cx+ox+0.7, z0:cz+oz-0.7,z1:cz+oz+0.7, y0:base+1.47, y1:base+1.47});
       }
       for(let px=-W+1;px<W;px+=3){ box(0.25,H,0.3, px,H/2,D+0.02, wallMatB); box(0.25,H,0.3, px,H/2,-D-0.02, wallMatB); }
     } else {
@@ -1336,7 +1337,7 @@ function buildWorldIndoor(rng){
   const sun=new THREE.DirectionalLight(0xfff2d8, 0.5);
   sun.position.set(18,40,10); scene.add(sun);
   obstacles=[]; platforms=[]; items=[]; waterMesh=null;
-  const H=20, FH=3.4, CW=4; // 半サイズ / 2階の高さ / 回廊の幅
+  const H=26, FH=3.4, CW=5; // 半サイズ / 2階の高さ / 回廊の幅
   const wallM=new THREE.MeshLambertMaterial({color:0xb9b2a4});
   const slabM=new THREE.MeshLambertMaterial({color:0x9aa0a8});
   const trimM=new THREE.MeshLambertMaterial({color:0x7b828c});
@@ -1359,7 +1360,7 @@ function buildWorldIndoor(rng){
   floor.rotation.x=-Math.PI/2; scene.add(floor);
   const ceil=new THREE.Mesh(new THREE.BoxGeometry(H*2+4,0.4,H*2+4), new THREE.MeshBasicMaterial({color:0x2c3038}));
   ceil.position.y=7.4; scene.add(ceil);
-  for(let lx=-12;lx<=12;lx+=12) for(let lz=-12;lz<=12;lz+=12){
+  for(let lx=-16;lx<=16;lx+=16) for(let lz=-16;lz<=16;lz+=16){
     const lamp=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.1,1.6), new THREE.MeshBasicMaterial({color:0xfff4cc}));
     lamp.position.set(lx,7.15,lz); scene.add(lamp);
   }
@@ -1399,30 +1400,31 @@ function buildWorldIndoor(rng){
     if(p.axis==='x') m.rotation.z=(p.lowEnd==='start'?1:-1)*ang;
     else m.rotation.x=(p.lowEnd==='start'?-1:1)*ang;
   }
-  ramp({x0:6,x1:8.6, z0:9,z1:H-CW, axis:'z', lowEnd:'start'});    // 北回廊へ
-  ramp({x0:-8.6,x1:-6, z0:-H+CW,z1:-9, axis:'z', lowEnd:'end'});  // 南回廊へ
-  ramp({z0:6,z1:8.6, x0:9,x1:H-CW, axis:'x', lowEnd:'start'});    // 東回廊へ
-  ramp({z0:-8.6,z1:-6, x0:-H+CW,x1:-9, axis:'x', lowEnd:'end'});  // 西回廊へ
+  ramp({x0:6,x1:8.6, z0:H-CW-7,z1:H-CW, axis:'z', lowEnd:'start'});    // 北回廊へ
+  ramp({x0:-8.6,x1:-6, z0:-H+CW,z1:-H+CW+7, axis:'z', lowEnd:'end'});  // 南回廊へ
+  ramp({z0:6,z1:8.6, x0:H-CW-7,x1:H-CW, axis:'x', lowEnd:'start'});    // 東回廊へ
+  ramp({z0:-8.6,z1:-6, x0:-H+CW,x1:-H+CW+7, axis:'x', lowEnd:'end'});  // 西回廊へ
   // 1階の遮蔽物: 低い壁と木箱
-  for(const [wx,wz,wr] of [[-10,0,0],[10,0,0],[0,-10,1],[0,10,1]]){
-    if(wr===0){ box(0.35,2.1,5, wx,1.05,wz,wallM); wallSeg(wx,wz-2.5, wx,wz+2.5, 2.1); }
-    else { box(5,2.1,0.35, wx,1.05,wz,wallM); wallSeg(wx-2.5,wz, wx+2.5,wz, 2.1); }
+  for(const [wx,wz,wr] of [[-13,0,0],[13,0,0],[0,-13,1],[0,13,1],[-13,-13,1],[13,13,1]]){
+    if(wr===0){ box(0.35,2.1,6, wx,1.05,wz,wallM); wallSeg(wx,wz-3, wx,wz+3, 2.1); }
+    else { box(6,2.1,0.35, wx,1.05,wz,wallM); wallSeg(wx-3,wz, wx+3,wz, 2.1); }
   }
-  for(let i=0;i<8;i++){
+  for(let i=0;i<12;i++){
     let bx=0,bz=0;
     for(let tr=0;tr<20;tr++){
-      bx=(rng()*2-1)*15; bz=(rng()*2-1)*15;
+      bx=(rng()*2-1)*20; bz=(rng()*2-1)*20;
       if(Math.abs(bx)>4.5 || Math.abs(bz)>4.5) break;
     }
     box(1.4,1.4,1.4, bx,0.7,bz, crateM);
     obstacles.push({x:bx,z:bz,rr:1.0,top:1.5});
+    platforms.push({x0:bx-0.7,x1:bx+0.7, z0:bz-0.7,z1:bz+0.7, y0:1.42, y1:1.42});
   }
   // アイテム
   let id=0;
   function addIndoorItem(kind,w){
     let x=0,z=0;
     for(let tr=0;tr<20;tr++){
-      x=(rng()*2-1)*15.5; z=(rng()*2-1)*15.5;
+      x=(rng()*2-1)*21; z=(rng()*2-1)*21;
       let blocked=false;
       for(const o of obstacles){ if(Math.hypot(x-o.x,z-o.z)<o.rr+0.7){ blocked=true; break; } }
       if(!blocked && (Math.abs(x)>4 || Math.abs(z)>4)) break;
@@ -1434,13 +1436,13 @@ function buildWorldIndoor(rng){
     id++;
   }
   const GUNS=[1,3,4,2,5];
-  for(let i=0;i<8;i++) addIndoorItem('gun',GUNS[i%5]);
-  for(let i=0;i<4;i++) addIndoorItem('nade',0);
-  for(let i=0;i<2;i++) addIndoorItem('ammo5',0);
+  for(let i=0;i<10;i++) addIndoorItem('gun',GUNS[i%5]);
+  for(let i=0;i<5;i++) addIndoorItem('nade',0);
+  for(let i=0;i<3;i++) addIndoorItem('ammo5',0);
   for(let i=0;i<2;i++) addIndoorItem('ammo7',0);
-  for(let i=0;i<2;i++) addIndoorItem('ammo9',0);
-  for(let i=0;i<4;i++) addIndoorItem('heal',0);
-  for(let i=0;i<2;i++) addIndoorItem('smoke',0);
+  for(let i=0;i<3;i++) addIndoorItem('ammo9',0);
+  for(let i=0;i<5;i++) addIndoorItem('heal',0);
+  for(let i=0;i<3;i++) addIndoorItem('smoke',0);
 
   foeMesh=hamModel(!isHost);
   scene.add(foeMesh);
@@ -1876,7 +1878,7 @@ $('ballBtn').addEventListener('mousedown',  e=>{ e.stopPropagation(); setBall(!m
 function doJump(){
   if(state!=='playing' || me.air || me.healT>0) return;
   if(me.prone) setProne(false);
-  me.air=true; me.vy=6.2;
+  me.air=true; me.vy=11.2;
   sfxJump();
   if(navigator.vibrate) navigator.vibrate(10);
 }
@@ -2074,8 +2076,8 @@ function startGame(){
   $('hpLabel').style.color = isHost ? '#5aa5e8' : '#f096b4';
   const rng=mulberry32(seed);
   if(mapSel===1){ // 屋内アリーナ: 平らな床・壁が境界
-    PLAY_R=32;
-    SPAWNS=[[-16,-16],[16,-16],[-16,16],[16,16]];
+    PLAY_R=40;
+    SPAWNS=[[-22,-22],[22,-22],[-22,22],[22,22]];
     heightFn=(x,z)=>0;
   } else {
     PLAY_R=78;
@@ -2191,7 +2193,7 @@ function hostSpawnBalloon(){
   const id=balloonSeq++;
   let x=0,z=0,y=0;
   if(mapSel===1){
-    x=(Math.random()*2-1)*16; z=(Math.random()*2-1)*16;
+    x=(Math.random()*2-1)*21; z=(Math.random()*2-1)*21;
     y=1.3+Math.random()*4.6;
   } else for(let tr=0;tr<20;tr++){
     const ang=Math.random()*6.28, r=4+Math.random()*58;
@@ -2228,7 +2230,7 @@ function spawnDummies(){
   const offs=[[0,-10],[-6,-9],[6,-9],[-3,-14],[3,-14]];
   for(let i=0;i<offs.length;i++){
     let sp=safeSpot(cx+offs[i][0], cz+offs[i][1]);
-    if(mapSel===1) sp=[clamp(sp[0],-17,17), clamp(sp[1],-17,17)];
+    if(mapSel===1) sp=[clamp(sp[0],-23,23), clamp(sp[1],-23,23)];
     const m=hamModel(i%2===1);
     const lb=makeLabelSprite('まと','#ffd166');
     lb.position.y=1.9; lb.scale.set(1.4,0.35,1);
@@ -3013,6 +3015,7 @@ function loop(t){
       else { nx=me.x; nz=me.z; }
     }
     for(const o of obstacles){
+      if(me.feetY>=o.top-0.15) continue; // 足が上端より高ければ飛び越せる
       const d=Math.hypot(nx-o.x,nz-o.z);
       if(d<o.rr+0.45 && d>0.001){ const k=(o.rr+0.45)/d; nx=o.x+(nx-o.x)*k; nz=o.z+(nz-o.z)*k; }
     }
@@ -3033,8 +3036,9 @@ function loop(t){
     } else {
       me.feetY=gh;
     }
-    const targetY=Math.max(gh, gh<WATER_Y?WATER_Y-0.5:gh)+(me.ball?0.85:me.prone?0.5:EYE);
-    me.eyeY += (targetY-me.eyeY)*Math.min(1,dt*14);
+    const fY=me.feetY;
+    const targetY=Math.max(fY, fY<WATER_Y?WATER_Y-0.5:fY)+(me.ball?0.85:me.prone?0.5:EYE);
+    me.eyeY += (targetY-me.eyeY)*Math.min(1,dt*(me.air?30:14));
     const wantFire = firing||keys['KeyF'];
     // 投げ物は「うつ」ボタン長押しで軌道表示、離した瞬間に投げる
     const nadeHold = wantFire;
