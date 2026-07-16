@@ -98,6 +98,10 @@
     width:48px; height:48px; border-radius:50%; background:rgba(255,170,60,0.15); border:2px solid rgba(255,190,90,0.65);
     color:rgba(255,255,255,0.95); font-family:inherit; font-weight:700; font-size:9px; line-height:1.25; z-index:21; touch-action:none; }
   #ballBtn.on { border-color:#ffd166; box-shadow:0 0 14px rgba(255,190,90,0.85); }
+  #jumpBtn { position:absolute; right:calc(12px + env(safe-area-inset-right)); top:calc(22%);
+    width:60px; height:60px; border-radius:50%; background:rgba(90,208,165,0.18); border:2px solid rgba(90,208,165,0.6);
+    color:rgba(255,255,255,0.95); font-family:inherit; font-weight:700; font-size:10px; z-index:21; touch-action:none; }
+  #jumpBtn:active { background:rgba(90,208,165,0.5); }
   #cross.lock::before, #cross.lock::after { background:#ff5a4a; }
   #cross.lock { transform:translate(-50%,-50%) scale(1.3); }
   #ballOv { display:none; position:absolute; inset:0; z-index:9; pointer-events:none;
@@ -195,7 +199,7 @@
   <button class="btn btn-pink" id="btnJoinMenu">部屋に入る(しろくまチーム)</button>
   <button class="btn btn-green" id="btnTrain">射撃訓練場(ひとりで練習)</button>
   <button class="btn btn-ghost" id="btnSettings">⚙ 設定</button>
-  <p class="sub">スマホはたて持ちでもよこ持ちでもOK / パソコンはWASD+マウス<br>Q=のぞく / C=匍匐 / B=バッグ / H=回復 / G=ボール</p>
+  <p class="sub">スマホはたて持ちでもよこ持ちでもOK / パソコンはWASD+マウス<br>Q=のぞく / C=匍匐 / B=バッグ / H=回復 / G=ボール / Space=ジャンプ</p>
 </div>
 
 <div id="setScreen" class="screen hidden">
@@ -265,6 +269,7 @@
   <button id="bagBtn">バッグ</button>
   <button id="proneBtn">匍匐</button>
   <button id="ballBtn">🐹<br>ボール</button>
+  <button id="jumpBtn">ジャンプ</button>
   <button id="exitBtn">訓練を終わる</button>
   <button id="fireBtn">うつ</button>
   <div id="slots">
@@ -378,11 +383,11 @@ function lostConn(){ if(state==='dead')return; state='dead'; show('lostScreen');
 const PLAY_R=78, EYE=1.35, KILL_WIN=2, BALLOON_WIN=20, WATER_Y=-2.3;
 // AR/SMGは高連射・低威力、スナイパーは単発・高威力。スコープは最初から内蔵(zoom)
 const WPN=[
-  {name:'G18',   cal:'9mm', cls:'pst', dmg:16, cd:0.3,   spd:70,  col:0x9aa3b2, spread:0.010, ammo:45, mag:15, rel:1.0, recoil:0.012, zoom:1.35},
-  {name:'M416',  cal:'5mm', cls:'ar',  dmg:9,  cd:0.09,  spd:75,  col:0x5ad0a5, spread:0.020, ammo:90, mag:30, rel:1.4, recoil:0.006, zoom:2},
+  {name:'G18',   cal:'9mm', cls:'pst', dmg:16, cd:0.3,   spd:70,  col:0x9aa3b2, spread:0.014, ammo:45, mag:15, rel:1.0, recoil:0.012, zoom:1.35, life:1.1},
+  {name:'M416',  cal:'5mm', cls:'ar',  dmg:9,  cd:0.09,  spd:110, col:0x5ad0a5, spread:0.010, ammo:90, mag:30, rel:1.4, recoil:0.006, zoom:2},
   {name:'Kar98', cal:'7mm', cls:'snp', dmg:60, cd:1.5,   spd:120, col:0xf0a54a, spread:0.003, ammo:15, mag:5,  rel:1.8, recoil:0.04,  zoom:4},
-  {name:'UMP',   cal:'9mm', cls:'smg', dmg:7,  cd:0.065, spd:65,  col:0x5ab8d0, spread:0.024, ammo:100,mag:30, rel:1.2, recoil:0.005, zoom:2},
-  {name:'M16',   cal:'5mm', cls:'ar',  dmg:11, cd:0.11,  spd:85,  col:0xd08a5a, spread:0.016, ammo:80, mag:25, rel:1.5, recoil:0.008, zoom:2},
+  {name:'UMP',   cal:'9mm', cls:'smg', dmg:7,  cd:0.065, spd:65,  col:0x5ab8d0, spread:0.038, ammo:100,mag:30, rel:1.2, recoil:0.005, zoom:2, life:0.5},
+  {name:'M16',   cal:'5mm', cls:'ar',  dmg:11, cd:0.11,  spd:120, col:0xd08a5a, spread:0.009, ammo:80, mag:25, rel:1.5, recoil:0.008, zoom:2},
   {name:'AWM',   cal:'7mm', cls:'snp', dmg:80, cd:2.2,   spd:140, col:0xb78ae8, spread:0.002, ammo:9,  mag:3,  rel:2.2, recoil:0.06,  zoom:8}
 ];
 const ammoKind=wid=>'ammo'+WPN[wid].cal[0]; // 予備弾はバッグのスタックで持つ
@@ -396,7 +401,7 @@ const SPAWNS=[[-42,-42],[42,-42],[-42,42],[42,42]];
 let heightFn=null, obstacles=[], items=[];
 let scene,camera,renderer,foeMesh,gunGroup,muzzle,waterMesh;
 const me={x:-24,z:-24,yaw:0,pitch:0,hp:100,score:0,cd:0,prot:0,slots:[0,null],sel:0,
-  mag:{}, rld:null,feetY:0,eyeY:0,zoom:false,prone:false,healT:0,stow:false,ball:false,ballE:1,
+  mag:{}, rld:null,feetY:0,eyeY:0,vy:0,air:false,zoom:false,prone:false,healT:0,stow:false,ball:false,ballE:1,
   bag:[]};
 // バッグ(8スロット・スタック制)
 function bagCount(k){ let n=0; for(const s of me.bag) if(s.k===k) n+=s.n; return n; }
@@ -797,15 +802,20 @@ function buildWorld(rng){
       box(W*2-0.3,0.22,(D-0.15)-(-D+SH), 0, fy+0.11, (D-0.15+(-D+SH))/2, slabM);
       platforms.push({x0:cx-W+0.15,x1:cx+W-0.15, z0:cz-D+SH,z1:cz+D-0.15, y0:base+fy+0.22, y1:base+fy+0.22});
     }
-    // 背面シャフト内のスロープ(1階→2階→…→屋上のつづら折り)
+    // 背面シャフト内の階段(1階→2階→…→屋上のつづら折り・1段0.425mで確実に登れる)
+    const STEPS=8;
     for(let n=0;n<FLOORS;n++){
-      const yLo=FH*n, yHi=FH*(n+1);
+      const yLo=FH*n;
       const x0=-W+0.6, x1=W-0.6, span=x1-x0;
-      const up = (n%2===0); // 偶数階は+x方向へ上る
-      const r=box(Math.hypot(span,FH),0.16,SH-0.5, 0, (yLo+yHi)/2, -D+SH/2-0.1, trimM);
-      r.rotation.z=(up?-1:1)*Math.atan2(FH,span);
-      platforms.push({x0:cx+x0,x1:cx+x1, z0:cz-D+0.35,z1:cz-D+SH+0.15, axis:'x',
-        y0:base+(up?yLo:yHi)+0.22, y1:base+(up?yHi:yLo)+0.22});
+      const up=(n%2===0); // 偶数階は+x方向へ上る
+      for(let k2=0;k2<STEPS;k2++){
+        const t0=k2/STEPS, t1=(k2+1)/STEPS;
+        const sx0=up? x0+span*t0 : x1-span*t1;
+        const sx1=up? x0+span*t1 : x1-span*t0;
+        const sy=yLo+FH*(k2+1)/STEPS;
+        box(sx1-sx0-0.04,0.22,SH-0.6, (sx0+sx1)/2, sy-0.11, -D+SH/2-0.15, k2%2?trimM:slabM);
+        platforms.push({x0:cx+sx0,x1:cx+sx1, z0:cz-D+0.3,z1:cz-D+SH+0.15, y0:base+sy, y1:base+sy});
+      }
     }
     // バルコニー(2〜4階、前面スロット外側)— 手すりは見た目のみ
     for(let n=1;n<FLOORS;n++){
@@ -844,7 +854,7 @@ function buildWorld(rng){
   ];
   const housePos=[];
   let placedH=0;
-  for(let att2=0; att2<80 && placedH<3; att2++){
+  for(let att2=0; att2<220 && placedH<6; att2++){
     const ang=rng()*6.28, r=14+rng()*46;
     const x=Math.cos(ang)*r, z=Math.sin(ang)*r, h=groundY(x,z);
     if(h<=WATER_Y+1.0 || h>10) continue;
@@ -1712,6 +1722,18 @@ function sfxRam(vol){ if(!audioInit())return; burst({dur:0.25,vol:0.7*vol,f:300}
 $('ballBtn').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); setBall(!me.ball); },{passive:false});
 $('ballBtn').addEventListener('mousedown',  e=>{ e.stopPropagation(); setBall(!me.ball); });
 
+// ---------------- ジャンプ ----------------
+function doJump(){
+  if(state!=='playing' || me.air || me.healT>0) return;
+  if(me.prone) setProne(false);
+  me.air=true; me.vy=6.2;
+  sfxJump();
+  if(navigator.vibrate) navigator.vibrate(10);
+}
+function sfxJump(){ if(!audioInit())return; tone({f:330,f2:540,dur:0.12,vol:0.2,type:'sine'}); }
+$('jumpBtn').addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); doJump(); },{passive:false});
+$('jumpBtn').addEventListener('mousedown',  e=>{ e.stopPropagation(); doJump(); });
+
 // ---------------- 回復キット使用 ----------------
 const HEAL_TIME=5;
 function updHealBtn(){
@@ -2220,7 +2242,7 @@ function spawnProjectile(origin,dir,w,mine){
   mesh.position.copy(origin);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
   scene.add(mesh);
-  projectiles.push({p:origin.clone(), v, mesh, life:2.2, mine, dmg:WPN[w].dmg});
+  projectiles.push({p:origin.clone(), v, mesh, life:WPN[w].life||2.2, mine, dmg:WPN[w].dmg});
 }
 function spawnNade(origin,vel,mine,smoke){
   const mesh=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,7),
@@ -2424,7 +2446,7 @@ function fire(){
   if(me.mag[wi]===0 && resAmmo(wi)>0) startReload(wi);
   updSlots();
   const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-  const spr=w.spread*(me.zoom?(zoomX()>=2?0.35:0.6):1);
+  const spr=w.spread*(me.zoom?(zoomX()>=2?0.08:0.25):1); // 覗くとほぼ中心に飛ぶ
   dir.x+=(Math.random()-0.5)*spr*2; dir.y+=(Math.random()-0.5)*spr*2; dir.z+=(Math.random()-0.5)*spr*2;
   dir.normalize();
   applyAimAssist(dir);
@@ -2706,6 +2728,7 @@ addEventListener('keydown', e=>{ keys[e.code]=true;
   if(e.code==='KeyE'&&state==='playing'){ const n=nearbyItems(); if(n.length) takeItem(n[0].it.id,true); }
   if(e.code==='KeyH')startHeal();
   if(e.code==='KeyG')setBall(!me.ball);
+  if(e.code==='Space'){ e.preventDefault(); doJump(); }
   if(e.code==='KeyB')toggleBag(); });
 addEventListener('keyup', e=>{ keys[e.code]=false; });
 addEventListener('contextmenu', e=>e.preventDefault());
@@ -2813,8 +2836,8 @@ function loop(t){
     const healMul = me.healT>0 ? 0.4 : 1;
     const stowMul = (me.stow && me.sel<2) ? 1.25 : 1; // 素手なら少し速い
     // ボール中はいつでも高速で転がれる
-    const SP = me.ball ? (wading ? 4.2 : 8.0)
-             : (wading ? 2.4 : (dash ? 6.0 : 3.4))*(me.prone?0.35:1)*adsMul*healMul*stowMul;
+    const SP = me.ball ? (wading ? 5.0 : 9.6)
+             : (wading ? 3.0 : (dash ? 7.6 : 4.4))*(me.prone?0.35:1)*adsMul*healMul*stowMul;
     let nx=me.x+(-Math.sin(me.yaw)*f+Math.cos(me.yaw)*s)*SP*dt;
     let nz=me.z+(-Math.cos(me.yaw)*f-Math.sin(me.yaw)*s)*SP*dt;
     // 体当たりのノックバック
@@ -2838,13 +2861,21 @@ function loop(t){
     bobPhase+=Math.min(mMove/Math.max(dt,0.001),7)*dt*1.7;
     walkAmp+=((mMove>0.008?1:0)-walkAmp)*Math.min(1,dt*8);
     if(myStepAcc>2.0){ myStepAcc=0; sfxStep(me.prone?0.2:0.5, wading); }
-    const gh=floorAt(me.x,me.z, me.feetY);
-    me.feetY=gh;
+    const gh=floorAt(me.x,me.z, me.feetY+(me.air?0.2:0));
+    if(me.air){
+      me.vy-=16*dt;
+      me.feetY+=me.vy*dt;
+      if(me.vy<=0 && me.feetY<=gh){ me.feetY=gh; me.air=false; me.vy=0; }
+    } else if(gh<me.feetY-0.7){
+      me.air=true; me.vy=0; // 足場から歩き出したら落下
+    } else {
+      me.feetY=gh;
+    }
     const targetY=Math.max(gh, gh<WATER_Y?WATER_Y-0.5:gh)+(me.ball?0.85:me.prone?0.5:EYE);
     me.eyeY += (targetY-me.eyeY)*Math.min(1,dt*14);
-    const wantFire = firing||keys['Space']||keys['KeyF'];
-    // 投げ物は「うつ」長押しでも、右画面タッチ(視点スティック)でも狙える
-    const nadeHold = wantFire || aim.id!==-1;
+    const wantFire = firing||keys['KeyF'];
+    // 投げ物は「うつ」ボタン長押しで軌道表示、離した瞬間に投げる
+    const nadeHold = wantFire;
     if(me.sel>=2 && me.healT<=0 && !me.ball){
       // 投げ物: 押している間は軌道を表示、離すとその軌道どおりに投げる
       const kind = me.sel===2?'nade':'smoke';
