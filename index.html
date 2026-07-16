@@ -1330,14 +1330,14 @@ loadModelParts('assets/stump.glb', p=>{ stumpParts=p; });
 function buildWorldIndoor(rng){
   scene=new THREE.Scene();
   scene.background=new THREE.Color(0x23262e);
-  scene.fog=new THREE.Fog(0x23262e, 34, 105);
+  scene.fog=new THREE.Fog(0x23262e, 40, 130);
   camera=new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 300);
   camera.rotation.order='YXZ';
   scene.add(new THREE.HemisphereLight(0xf0f2f8, 0x4a4e58, 1.15));
   const sun=new THREE.DirectionalLight(0xfff2d8, 0.5);
   sun.position.set(18,40,10); scene.add(sun);
   obstacles=[]; platforms=[]; items=[]; waterMesh=null;
-  const H=26, FH=3.4, CW=5; // 半サイズ / 2階の高さ / 回廊の幅
+  const H=32, FH=3.4, CW=7; // 半サイズ / 2階の高さ / 回廊の幅
   const wallM=new THREE.MeshLambertMaterial({color:0xb9b2a4});
   const slabM=new THREE.MeshLambertMaterial({color:0x9aa0a8});
   const trimM=new THREE.MeshLambertMaterial({color:0x7b828c});
@@ -1355,12 +1355,12 @@ function buildWorldIndoor(rng){
     fx2.fillRect(cx2*16,cy*16,16,16);
   }
   const fTex=new THREE.CanvasTexture(fc);
-  fTex.wrapS=fTex.wrapT=THREE.RepeatWrapping; fTex.repeat.set(10,10);
+  fTex.wrapS=fTex.wrapT=THREE.RepeatWrapping; fTex.repeat.set(13,13);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(H*2+4,H*2+4), new THREE.MeshLambertMaterial({color:0xffffff, map:fTex}));
   floor.rotation.x=-Math.PI/2; scene.add(floor);
   const ceil=new THREE.Mesh(new THREE.BoxGeometry(H*2+4,0.4,H*2+4), new THREE.MeshBasicMaterial({color:0x2c3038}));
   ceil.position.y=7.4; scene.add(ceil);
-  for(let lx=-16;lx<=16;lx+=16) for(let lz=-16;lz<=16;lz+=16){
+  for(let lx=-24;lx<=24;lx+=16) for(let lz=-24;lz<=24;lz+=16){
     const lamp=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.1,1.6), new THREE.MeshBasicMaterial({color:0xfff4cc}));
     lamp.position.set(lx,7.15,lz); scene.add(lamp);
   }
@@ -1379,11 +1379,11 @@ function buildWorldIndoor(rng){
   plat(-H,H, H-CW,H); plat(-H,H, -H,-H+CW);
   plat(-H,-H+CW, -H+CW,H-CW); plat(H-CW,H, -H+CW,H-CW);
   // 2階中央: 4方向から合流する十字ブリッジ(吹き抜け・手すりなし)
-  plat(-3,3,-3,3);
-  plat(-1.3,1.3, 3,H-CW); plat(-1.3,1.3, -H+CW,-3);
-  plat(3,H-CW, -1.3,1.3); plat(-H+CW,-3, -1.3,1.3);
+  plat(-4.5,4.5,-4.5,4.5);
+  plat(-2.2,2.2, 4.5,H-CW); plat(-2.2,2.2, -H+CW,-4.5);
+  plat(4.5,H-CW, -2.2,2.2); plat(-H+CW,-4.5, -2.2,2.2);
   // 中央ブリッジの支柱(1階の遮蔽物にもなる)
-  for(const px of [-3,3]) for(const pz of [-3,3]){
+  for(const px of [-4.5,4.5]) for(const pz of [-4.5,4.5]){
     const pil=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.4,FH,8), trimM);
     pil.position.set(px,FH/2,pz); scene.add(pil);
     obstacles.push({x:px,z:pz,rr:0.4,top:FH-0.1});
@@ -1400,31 +1400,50 @@ function buildWorldIndoor(rng){
     if(p.axis==='x') m.rotation.z=(p.lowEnd==='start'?1:-1)*ang;
     else m.rotation.x=(p.lowEnd==='start'?-1:1)*ang;
   }
-  ramp({x0:6,x1:8.6, z0:H-CW-7,z1:H-CW, axis:'z', lowEnd:'start'});    // 北回廊へ
-  ramp({x0:-8.6,x1:-6, z0:-H+CW,z1:-H+CW+7, axis:'z', lowEnd:'end'});  // 南回廊へ
-  ramp({z0:6,z1:8.6, x0:H-CW-7,x1:H-CW, axis:'x', lowEnd:'start'});    // 東回廊へ
-  ramp({z0:-8.6,z1:-6, x0:-H+CW,x1:-H+CW+7, axis:'x', lowEnd:'end'});  // 西回廊へ
+  ramp({x0:7,x1:9.6, z0:H-CW-7,z1:H-CW, axis:'z', lowEnd:'start'});     // 北回廊へ(東側)
+  ramp({x0:-9.6,x1:-7, z0:H-CW-7,z1:H-CW, axis:'z', lowEnd:'start'});   // 北回廊へ(西側)
+  ramp({x0:-9.6,x1:-7, z0:-H+CW,z1:-H+CW+7, axis:'z', lowEnd:'end'});   // 南回廊へ(西側)
+  ramp({x0:7,x1:9.6, z0:-H+CW,z1:-H+CW+7, axis:'z', lowEnd:'end'});     // 南回廊へ(東側)
+  ramp({z0:7,z1:9.6, x0:H-CW-7,x1:H-CW, axis:'x', lowEnd:'start'});     // 東回廊へ(北側)
+  ramp({z0:-9.6,z1:-7, x0:H-CW-7,x1:H-CW, axis:'x', lowEnd:'start'});   // 東回廊へ(南側)
+  ramp({z0:-9.6,z1:-7, x0:-H+CW,x1:-H+CW+7, axis:'x', lowEnd:'end'});   // 西回廊へ(南側)
+  ramp({z0:7,z1:9.6, x0:-H+CW,x1:-H+CW+7, axis:'x', lowEnd:'end'});     // 西回廊へ(北側)
   // 1階の遮蔽物: 低い壁と木箱
-  for(const [wx,wz,wr] of [[-13,0,0],[13,0,0],[0,-13,1],[0,13,1],[-13,-13,1],[13,13,1]]){
+  for(const [wx,wz,wr] of [[-15,0,0],[15,0,0],[0,-15,1],[0,15,1],[-16,-16,1],[16,16,1],[-16,16,0],[16,-16,0]]){
     if(wr===0){ box(0.35,2.1,6, wx,1.05,wz,wallM); wallSeg(wx,wz-3, wx,wz+3, 2.1); }
     else { box(6,2.1,0.35, wx,1.05,wz,wallM); wallSeg(wx-3,wz, wx+3,wz, 2.1); }
   }
-  for(let i=0;i<12;i++){
+  for(let i=0;i<16;i++){
     let bx=0,bz=0;
     for(let tr=0;tr<20;tr++){
-      bx=(rng()*2-1)*20; bz=(rng()*2-1)*20;
-      if(Math.abs(bx)>4.5 || Math.abs(bz)>4.5) break;
+      bx=(rng()*2-1)*26; bz=(rng()*2-1)*26;
+      if(Math.abs(bx)>6 || Math.abs(bz)>6) break;
     }
     box(1.4,1.4,1.4, bx,0.7,bz, crateM);
     obstacles.push({x:bx,z:bz,rr:1.0,top:1.5});
     platforms.push({x0:bx-0.7,x1:bx+0.7, z0:bz-0.7,z1:bz+0.7, y0:1.42, y1:1.42});
   }
+  // 2階の遮蔽物: 回廊の木箱(下の1階は素通りできる)と中央・ブリッジの低壁
+  function crate2F(bx,bz){
+    box(1.4,1.4,1.4, bx,FH+0.7,bz, crateM);
+    obstacles.push({x:bx,z:bz,rr:1.0,top:FH+1.5,bot:FH});
+    platforms.push({x0:bx-0.7,x1:bx+0.7, z0:bz-0.7,z1:bz+0.7, y0:FH+1.42, y1:FH+1.42});
+  }
+  const CC=H-CW/2; // 回廊の中心線
+  for(const [bx,bz] of [[-14,CC],[14,-CC],[CC,14],[-CC,-14],[CC,-CC],[-CC,CC]]) crate2F(bx,bz);
+  function lowWall2F(wx,wz,alongX){ // 横をすり抜けられる長さ(飛び越えも可)
+    if(alongX){ box(1.9,1.05,0.32, wx,FH+0.52,wz,trimM); for(const t of [-0.7,0,0.7]) obstacles.push({x:wx+t,z:wz,rr:0.32,top:FH+1.05,bot:FH}); }
+    else { box(0.32,1.05,1.9, wx,FH+0.52,wz,trimM); for(const t of [-0.7,0,0.7]) obstacles.push({x:wx,z:wz+t,rr:0.32,top:FH+1.05,bot:FH}); }
+  }
+  lowWall2F(0, 4.5, true);  lowWall2F(0, -4.5, true);   // 中央プラットフォームの南北縁
+  lowWall2F(0, 15, true);   lowWall2F(0, -15, true);    // 南北ブリッジの中間
+  lowWall2F(15, 0, false);  lowWall2F(-15, 0, false);   // 東西ブリッジの中間
   // アイテム
   let id=0;
   function addIndoorItem(kind,w){
     let x=0,z=0;
     for(let tr=0;tr<20;tr++){
-      x=(rng()*2-1)*21; z=(rng()*2-1)*21;
+      x=(rng()*2-1)*27; z=(rng()*2-1)*27;
       let blocked=false;
       for(const o of obstacles){ if(Math.hypot(x-o.x,z-o.z)<o.rr+0.7){ blocked=true; break; } }
       if(!blocked && (Math.abs(x)>4 || Math.abs(z)>4)) break;
@@ -1436,12 +1455,12 @@ function buildWorldIndoor(rng){
     id++;
   }
   const GUNS=[1,3,4,2,5];
-  for(let i=0;i<10;i++) addIndoorItem('gun',GUNS[i%5]);
-  for(let i=0;i<5;i++) addIndoorItem('nade',0);
+  for(let i=0;i<12;i++) addIndoorItem('gun',GUNS[i%5]);
+  for(let i=0;i<6;i++) addIndoorItem('nade',0);
   for(let i=0;i<3;i++) addIndoorItem('ammo5',0);
-  for(let i=0;i<2;i++) addIndoorItem('ammo7',0);
+  for(let i=0;i<3;i++) addIndoorItem('ammo7',0);
   for(let i=0;i<3;i++) addIndoorItem('ammo9',0);
-  for(let i=0;i<5;i++) addIndoorItem('heal',0);
+  for(let i=0;i<6;i++) addIndoorItem('heal',0);
   for(let i=0;i<3;i++) addIndoorItem('smoke',0);
 
   foeMesh=hamModel(!isHost);
@@ -2076,8 +2095,8 @@ function startGame(){
   $('hpLabel').style.color = isHost ? '#5aa5e8' : '#f096b4';
   const rng=mulberry32(seed);
   if(mapSel===1){ // 屋内アリーナ: 平らな床・壁が境界
-    PLAY_R=40;
-    SPAWNS=[[-22,-22],[22,-22],[-22,22],[22,22]];
+    PLAY_R=48;
+    SPAWNS=[[-28,-28],[28,-28],[-28,28],[28,28]];
     heightFn=(x,z)=>0;
   } else {
     PLAY_R=78;
@@ -2193,7 +2212,7 @@ function hostSpawnBalloon(){
   const id=balloonSeq++;
   let x=0,z=0,y=0;
   if(mapSel===1){
-    x=(Math.random()*2-1)*21; z=(Math.random()*2-1)*21;
+    x=(Math.random()*2-1)*27; z=(Math.random()*2-1)*27;
     y=1.3+Math.random()*4.6;
   } else for(let tr=0;tr<20;tr++){
     const ang=Math.random()*6.28, r=4+Math.random()*58;
@@ -2230,7 +2249,7 @@ function spawnDummies(){
   const offs=[[0,-10],[-6,-9],[6,-9],[-3,-14],[3,-14]];
   for(let i=0;i<offs.length;i++){
     let sp=safeSpot(cx+offs[i][0], cz+offs[i][1]);
-    if(mapSel===1) sp=[clamp(sp[0],-23,23), clamp(sp[1],-23,23)];
+    if(mapSel===1) sp=[clamp(sp[0],-29,29), clamp(sp[1],-29,29)];
     const m=hamModel(i%2===1);
     const lb=makeLabelSprite('まと','#ffd166');
     lb.position.y=1.9; lb.scale.set(1.4,0.35,1);
@@ -2467,7 +2486,7 @@ function losClear(x0,y0,z0,x1,y1,z1,d){
   for(let i=1;i<n;i++){
     const t=i/n, sx=x0+(x1-x0)*t, sy=y0+(y1-y0)*t, sz=z0+(z1-z0)*t;
     if(groundY(sx,sz)>sy) return false;
-    for(const o of obstacles){ if(sy<o.top && Math.hypot(sx-o.x,sz-o.z)<o.rr) return false; }
+    for(const o of obstacles){ if(sy<o.top && !(o.bot!==undefined&&sy<o.bot) && Math.hypot(sx-o.x,sz-o.z)<o.rr) return false; }
     for(const p of platforms){
       if(sx>=p.x0&&sx<=p.x1&&sz>=p.z0&&sz<=p.z1){
         const py=platY(p,sx,sz);
@@ -2672,7 +2691,7 @@ function updateProjectiles(dt){
         if(sy<gh){ puff(new THREE.Vector3(sx,sy,sz),0x8a7f6a,0.3); dead=true; break; }
         let hitObs=false;
         for(const o of obstacles){
-          if(Math.hypot(sx-o.x,sz-o.z)<o.rr && sy<o.top){ puff(new THREE.Vector3(sx,sy,sz),0x999488,0.25); dead=true; hitObs=true; break; }
+          if(Math.hypot(sx-o.x,sz-o.z)<o.rr && sy<o.top && !(o.bot!==undefined&&sy<o.bot)){ puff(new THREE.Vector3(sx,sy,sz),0x999488,0.25); dead=true; hitObs=true; break; }
         }
         if(!hitObs) for(const p of platforms){
           if(sx>=p.x0&&sx<=p.x1&&sz>=p.z0&&sz<=p.z1){
@@ -3016,6 +3035,7 @@ function loop(t){
     }
     for(const o of obstacles){
       if(me.feetY>=o.top-0.15) continue; // 足が上端より高ければ飛び越せる
+      if(o.bot!==undefined && me.feetY<o.bot-1.2) continue; // 2階上の障害物は下をくぐれる
       const d=Math.hypot(nx-o.x,nz-o.z);
       if(d<o.rr+0.45 && d>0.001){ const k=(o.rr+0.45)/d; nx=o.x+(nx-o.x)*k; nz=o.z+(nz-o.z)*k; }
     }
