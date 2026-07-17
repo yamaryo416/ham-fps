@@ -582,18 +582,26 @@ function makeItemGroup(kind,w){
     const cr2=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.26,0.37), LM(0x3fae5a));
     obj.add(box2,cr1,cr2);
   } else if(kind==='nade'){
-    const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x4a5d3a}));
-    const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.14,6), new THREE.MeshLambertMaterial({color:0x9aa0b0}));
-    cap.position.y=0.26; obj.add(b,cap);
+    const gm=glbClone('nade',false);
+    if(gm){ obj.add(gm); }
+    else {
+      const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x4a5d3a}));
+      const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.14,6), new THREE.MeshLambertMaterial({color:0x9aa0b0}));
+      cap.position.y=0.26; obj.add(b,cap);
+    }
   } else if(kind==='smoke'){
     const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x788088}));
     const band=new THREE.Mesh(new THREE.CylinderGeometry(0.245,0.245,0.08,10,1,true), new THREE.MeshLambertMaterial({color:0xe8e8e8}));
     obj.add(b,band);
   } else if(kind==='mine'){
-    const b=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.28,0.1,10), new THREE.MeshLambertMaterial({color:0x3a3f35}));
-    const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,5), new THREE.MeshBasicMaterial({color:0xff4a3a}));
-    lamp.position.y=0.1;
-    obj.add(b,lamp);
+    const gm=glbClone('mine',false);
+    if(gm){ obj.add(gm); }
+    else {
+      const b=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.28,0.1,10), new THREE.MeshLambertMaterial({color:0x3a3f35}));
+      const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,5), new THREE.MeshBasicMaterial({color:0xff4a3a}));
+      lamp.position.y=0.1;
+      obj.add(b,lamp);
+    }
   } else if(kind==='slow'){
     const c1=new THREE.Mesh(new THREE.ConeGeometry(0.16,0.2,8), new THREE.MeshLambertMaterial({color:0x6ac4ff, transparent:true, opacity:0.85}));
     c1.position.y=0.12;
@@ -1653,7 +1661,9 @@ const GLB_DEFS={
   awm:  {file:'assets/awm.glb',  rotY: Math.PI/2, len:1.15, ilen:1.25},
   ammo5:{file:'assets/ammo5.glb', ilen:0.55},
   ammo7:{file:'assets/ammo7.glb', ilen:0.55},
-  ammo9:{file:'assets/ammo9.glb', ilen:0.55}
+  ammo9:{file:'assets/ammo9.glb', ilen:0.55},
+  nade: {file:'assets/nade.glb',  ilen:0.5,  len:0.2},
+  mine: {file:'assets/mine.glb',  ilen:0.6,  len:0.18, rotX:-Math.PI/2}
 };
 const WPN_GLB_KEY=['g18','m416','kar98','ump','m16','awm']; // WPNインデックス→キー
 const GLBS={};
@@ -1693,6 +1703,7 @@ function glbClone(key, forView){
   const g=t.clone(true);
   g.scale.setScalar((forView?def.len:def.ilen)/maxd);
   if(forView && def.rotY) g.rotation.y=def.rotY;
+  if(def.rotX) g.rotation.x=def.rotX;
   return g;
 }
 // 読み込み完了時: 表示中の落ちアイテム・手元モデルを差し替える
@@ -1830,23 +1841,35 @@ function buildViewModel(){
     return;
   }
   if(me.sel===4){ // 地雷: 手のひらの円盤
-    const b=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.08,0.028,10), new THREE.MeshLambertMaterial({color:0x3a3f35}));
-    const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.018,6,5), new THREE.MeshBasicMaterial({color:0xff4a3a}));
-    lamp.position.y=0.03;
-    p1.position.set(-0.04,-0.05,0.03); p2.position.set(0.05,-0.04,0.02);
-    gunGroup.add(b,lamp,p1,p2);
+    const gm=glbClone('mine',true);
+    if(gm){
+      p1.position.set(-0.04,-0.06,0.03); p2.position.set(0.05,-0.05,0.02);
+      gunGroup.add(gm,p1,p2);
+    } else {
+      const b=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.08,0.028,10), new THREE.MeshLambertMaterial({color:0x3a3f35}));
+      const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.018,6,5), new THREE.MeshBasicMaterial({color:0xff4a3a}));
+      lamp.position.y=0.03;
+      p1.position.set(-0.04,-0.05,0.03); p2.position.set(0.05,-0.04,0.02);
+      gunGroup.add(b,lamp,p1,p2);
+    }
     gunGroup.position.set(0.3,-0.28,-0.55);
     updSlots();
     return;
   }
   if(me.sel===2 || me.sel===3){
     const smoke=me.sel===3;
-    const b=new THREE.Mesh(new THREE.SphereGeometry(0.07,8,7),
-      new THREE.MeshLambertMaterial({color:smoke?0x788088:0x4a5d3a}));
-    const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.05,6), new THREE.MeshLambertMaterial({color:0x9aa0b0}));
-    cap.position.y=0.08;
-    p1.position.set(-0.04,-0.05,0.03); p2.position.set(0.05,-0.04,0.02);
-    gunGroup.add(b,cap,p1,p2);
+    const gm=!smoke ? glbClone('nade',true) : null;
+    if(gm){
+      p1.position.set(-0.05,-0.08,0.03); p2.position.set(0.06,-0.07,0.02);
+      gunGroup.add(gm,p1,p2);
+    } else {
+      const b=new THREE.Mesh(new THREE.SphereGeometry(0.07,8,7),
+        new THREE.MeshLambertMaterial({color:smoke?0x788088:0x4a5d3a}));
+      const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.05,6), new THREE.MeshLambertMaterial({color:0x9aa0b0}));
+      cap.position.y=0.08;
+      p1.position.set(-0.04,-0.05,0.03); p2.position.set(0.05,-0.04,0.02);
+      gunGroup.add(b,cap,p1,p2);
+    }
     gunGroup.position.set(0.3,-0.28,-0.55);
   } else {
     const wid=me.slots[me.sel], w=WPN[wid];
@@ -2582,10 +2605,14 @@ function takeItem(id,mine){
 // ---------------- 地雷 ----------------
 function spawnMine(id,x,y,z,mine){
   const g=new THREE.Group();
-  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.3,0.09,10), new THREE.MeshLambertMaterial({color:0x3a3f35}));
-  body.position.y=0.045; g.add(body);
+  const gm=glbClone('mine',false);
+  if(gm){ gm.position.y=0.14; g.add(gm); }
+  else {
+    const body=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.3,0.09,10), new THREE.MeshLambertMaterial({color:0x3a3f35}));
+    body.position.y=0.045; g.add(body);
+  }
   const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,5), new THREE.MeshBasicMaterial({color:0x666666}));
-  lamp.position.y=0.11; g.add(lamp);
+  lamp.position.y=gm?0.32:0.11; g.add(lamp);
   if(mine){ // 自分の地雷は赤いリングで場所がわかる(壁越しにも見える)
     const ring=new THREE.Mesh(new THREE.TorusGeometry(0.45,0.035,6,20),
       new THREE.MeshBasicMaterial({color:0xff4a3a, transparent:true, opacity:0.8, depthTest:false, depthWrite:false}));
@@ -2644,7 +2671,12 @@ function spawnProjectile(origin,dir,w,mine){
   projectiles.push({p:origin.clone(), v, mesh, life:WPN[w].life||2.2, mine, dmg:WPN[w].dmg});
 }
 function spawnNade(origin,vel,mine,smoke){
-  const mesh=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,7),
+  let mesh=null;
+  if(!smoke){
+    const gm=glbClone('nade',false);
+    if(gm){ gm.scale.multiplyScalar(0.55); mesh=gm; }
+  }
+  if(!mesh) mesh=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,7),
     new THREE.MeshLambertMaterial({color:smoke?0x788088:0x4a5d3a}));
   mesh.position.copy(origin); scene.add(mesh);
   nadesArr.push({p:origin.clone(), v:vel.clone(), mesh, life:smoke?1.6:2.2, mine, smoke:!!smoke});
