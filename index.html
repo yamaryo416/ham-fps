@@ -590,9 +590,13 @@ function makeItemGroup(kind,w){
       cap.position.y=0.26; obj.add(b,cap);
     }
   } else if(kind==='smoke'){
-    const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x788088}));
-    const band=new THREE.Mesh(new THREE.CylinderGeometry(0.245,0.245,0.08,10,1,true), new THREE.MeshLambertMaterial({color:0xe8e8e8}));
-    obj.add(b,band);
+    const gm=glbClone('smoke',false);
+    if(gm){ obj.add(gm); }
+    else {
+      const b=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,7), new THREE.MeshLambertMaterial({color:0x788088}));
+      const band=new THREE.Mesh(new THREE.CylinderGeometry(0.245,0.245,0.08,10,1,true), new THREE.MeshLambertMaterial({color:0xe8e8e8}));
+      obj.add(b,band);
+    }
   } else if(kind==='mine'){
     const gm=glbClone('mine',false);
     if(gm){ obj.add(gm); }
@@ -1663,6 +1667,7 @@ const GLB_DEFS={
   ammo7:{file:'assets/ammo7.glb', ilen:0.55},
   ammo9:{file:'assets/ammo9.glb', ilen:0.55},
   nade: {file:'assets/nade.glb',  ilen:0.5,  len:0.2},
+  smoke:{file:'assets/smoke.glb', ilen:0.5,  len:0.2},
   mine: {file:'assets/mine.glb',  ilen:0.6,  len:0.18, rotX:-Math.PI/2}
 };
 const WPN_GLB_KEY=['g18','m416','kar98','ump','m16','awm']; // WPNインデックス→キー
@@ -1858,7 +1863,7 @@ function buildViewModel(){
   }
   if(me.sel===2 || me.sel===3){
     const smoke=me.sel===3;
-    const gm=!smoke ? glbClone('nade',true) : null;
+    const gm=glbClone(smoke?'smoke':'nade',true);
     if(gm){
       p1.position.set(-0.05,-0.08,0.03); p2.position.set(0.06,-0.07,0.02);
       gunGroup.add(gm,p1,p2);
@@ -2672,8 +2677,8 @@ function spawnProjectile(origin,dir,w,mine){
 }
 function spawnNade(origin,vel,mine,smoke){
   let mesh=null;
-  if(!smoke){
-    const gm=glbClone('nade',false);
+  {
+    const gm=glbClone(smoke?'smoke':'nade',false);
     if(gm){ gm.scale.multiplyScalar(0.55); mesh=gm; }
   }
   if(!mesh) mesh=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,7),
